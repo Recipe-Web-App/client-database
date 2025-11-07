@@ -1,0 +1,41 @@
+labels: [show-and-tell]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share what you've built using this project!
+
+  - type: textarea
+    attributes:
+      label: What Did You Build?
+      description: Tell us about your project or implementation
+      placeholder: Describe what you built...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: How Are You Using This Project?
+      description: How does this database project fit into your solution?
+      placeholder: Explain your use case...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Interesting Challenges or Solutions
+      description: Any interesting problems you solved or techniques you used?
+      placeholder: Share your experience...
+
+  - type: textarea
+    attributes:
+      label: Screenshots or Demo
+      description: Share screenshots, links, or demo information
+      placeholder: Add screenshots or links...
+
+  - type: textarea
+    attributes:
+      label: Feedback for the Project
+      description: Any feedback or suggestions for the project?
+      placeholder: What could be improved?

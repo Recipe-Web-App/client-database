@@ -1,0 +1,98 @@
+name: Documentation
+description: Suggest documentation improvements
+title: "[Docs]: "
+labels: [documentation]
+assignees:
+  - jsamuelsen11
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Documentation Type
+      description: What kind of documentation issue is this?
+      options:
+        - Missing Documentation
+        - Incorrect Documentation
+        - Unclear Documentation
+        - Typo/Grammar
+        - Outdated Documentation
+        - Example Needed
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Where is the documentation located?
+      options:
+        - README
+        - Architecture Documentation
+        - Database Design Documentation
+        - Deployment Plan
+        - Repository Structure
+        - Code Comments
+        - Scripts Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: Describe the documentation issue
+      placeholder: What's wrong with the documentation?...
+    validations:
+      required: true
+
+  - type: textarea
+    id: file-location
+    attributes:
+      label: Specific Location
+      description: File path, line number, or URL
+      placeholder: |
+        File: docs/DATABASE_DESIGN.md
+        Line: 42
+        URL: https://...
+      render: markdown
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current Documentation
+      description: Quote the current documentation (if applicable)
+      placeholder: Quote the problematic text...
+      render: markdown
+
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested Improvement
+      description: How should it be improved?
+      placeholder: Suggest improved wording or content...
+      render: markdown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Target Audience
+      description: Who is this documentation for?
+      options:
+        - Developers
+        - Database Administrators
+        - DevOps Engineers
+        - End Users
+        - All Users
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context
+      placeholder: Add additional context...

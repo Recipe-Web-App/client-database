@@ -1,0 +1,116 @@
+name: Performance Issue
+description: Report a performance problem
+title: "[Performance]: "
+labels: [performance, needs-triage]
+assignees:
+  - jsamuelsen11
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Performance Issue Description
+      description: Describe the performance problem
+      placeholder: What performance issue are you experiencing?...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which component has performance issues?
+      options:
+        - Database Queries
+        - Database Schema
+        - Kubernetes Deployment
+        - Shell Scripts
+        - Docker Builds
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Impact Severity
+      description: How severe is the performance impact?
+      options:
+        - Critical - System unusable
+        - High - Significant degradation
+        - Medium - Noticeable slowness
+        - Low - Minor impact
+    validations:
+      required: true
+
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Performance Metrics
+      description: Provide actual performance numbers
+      placeholder: |
+        - Current query time: 5s
+        - Expected query time: <100ms
+        - Current throughput: 10 ops/sec
+        - Expected throughput: 1000 ops/sec
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can this performance issue be reproduced?
+      placeholder: |
+        1. Run query...
+        2. Deploy to...
+        3. Measure performance...
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: load
+    attributes:
+      label: Load Characteristics
+      description: Describe the load conditions
+      placeholder: |
+        - Number of concurrent connections: 100
+        - Request rate: 1000/sec
+        - Data size: 1M rows
+      render: markdown
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Environment configuration
+      placeholder: |
+        - MySQL Version: 8.0.x
+        - Kubernetes: 1.28.x
+        - Hardware: 4 CPU, 8GB RAM
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Configuration
+      description: Relevant configuration settings
+      placeholder: MySQL configuration, K8s resource limits, etc...
+
+  - type: textarea
+    id: profiling
+    attributes:
+      label: Profiling Data
+      description: Any profiling or diagnostic data
+      placeholder: EXPLAIN output, slow query logs, etc...
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context
+      placeholder: Add additional context...

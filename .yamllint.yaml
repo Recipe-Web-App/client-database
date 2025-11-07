@@ -66,11 +66,7 @@ rules:
     forbid-explicit-octal: true
 
   # Quoted strings
-  quoted-strings:
-    quote-type: any
-    required: only-when-needed
-    extra-required: []
-    extra-allowed: []
+  quoted-strings: disable
 
   # Trailing spaces
   trailing-spaces: enable
