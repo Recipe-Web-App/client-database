@@ -1,0 +1,172 @@
+# Client Database - .gitignore
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Backup files (stored locally, not in version control)
+db/data/backups/*
+!db/data/backups/.gitkeep
+*.sql.gz
+
+# Export files
+db/data/exports/*
+!db/data/exports/.gitkeep
+
+# Kubernetes secrets (generated from templates)
+k8s/secret.yaml
+k8s/configmap.yaml
+
+# Kubernetes generated manifests
+k8s/*-generated.yaml
+
+# MySQL data directory (if running locally)
+mysql-data/
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Docker
+.dockerignore
+
+# Kubernetes local development
+kubeconfig
+*.kubeconfig
+
+# Helm (if used in future)
+charts/*/charts/
+*.tgz
+
+# Terraform (if used in future)
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# Sensitive files
+secrets/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+credentials.json
+service-account.json
+
+# Build artifacts
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+bin/
+
+# Test coverage
+coverage/
+*.cover
+*.coverage
+
+# Dependency directories
+node_modules/
+vendor/
+
+# Python (if any Python tools are added)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+.pytest_cache/
+.tox/
+venv/
+env/
+ENV/
+
+# Go (if any Go tools are built locally)
+*.test
+*.out
+go.work
+go.work.sum
+
+# Backup copies
+*.bak
+*.backup
+*-backup
+*-old
+
+# Archive files (unless intentionally versioned)
+*.tar
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Local configuration overrides
+config.local.yaml
+config.local.yml
+settings.local.json
+
+# Notes and scratch files
+notes.txt
+TODO.txt
+scratch/
+temp/
+
+# CI/CD artifacts (if any)
+.github/workflows/artifacts/
+
+# Migration tool state
+.migrate/
+
+# Kubernetes Job outputs
+job-*.yaml
+
+# Local testing
+test-data/
+test-backups/
+
+# Example/template directory (keep .gitkeep files)
+**/examples/*
+!**/examples/.gitkeep
+
+# Pre-Commit data
+.pre-commit-trivy-cache/
