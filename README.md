@@ -4,7 +4,9 @@ MySQL database for storing OAuth2 client credentials used by the auth-service.
 
 ## Overview
 
-The client-database is a Kubernetes-deployed MySQL 8.0 database that provides persistent storage for OAuth2 client credentials. It is optimized for read-heavy workloads with infrequent writes, serving authentication requests from the auth-service.
+The client-database is a Kubernetes-deployed MySQL 8.0 database that provides persistent storage for OAuth2 client
+credentials. It is optimized for read-heavy workloads with infrequent writes, serving authentication requests from the
+auth-service.
 
 ### Key Features
 
@@ -28,29 +30,33 @@ The client-database is a Kubernetes-deployed MySQL 8.0 database that provides pe
 ### Installation
 
 1. **Configure environment**:
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 2. **Deploy to Kubernetes**:
+
    ```bash
    ./scripts/containerManagement/deploy-container.sh
    ```
 
 3. **Initialize database**:
+
    ```bash
    ./scripts/dbManagement/load-schema.sh
    ```
 
 4. **Verify deployment**:
+
    ```bash
    ./scripts/containerManagement/get-container-status.sh
    ```
 
 ## Repository Structure
 
-```
+```text
 client-database/
 ├── db/                  # Database schema, fixtures, queries
 ├── docs/                # Comprehensive documentation
@@ -66,27 +72,33 @@ client-database/
 ## Operations
 
 ### Backup Database
+
 ```bash
 ./scripts/dbManagement/backup-db.sh
 ```
+
 Backups are stored in `db/data/backups/` with timestamp naming.
 
 ### Restore Database
+
 ```bash
 ./scripts/dbManagement/restore-db.sh clients-20250106-120000.sql.gz
 ```
 
 ### Connect to Database
+
 ```bash
 ./scripts/dbManagement/db-connect.sh
 ```
 
 ### Run Migrations
+
 ```bash
 ./scripts/dbManagement/migrate.sh
 ```
 
 ### Check Status
+
 ```bash
 ./scripts/containerManagement/get-container-status.sh
 ```
@@ -123,6 +135,7 @@ db, err := sql.Open("mysql", dsn)
 ```
 
 **Connection Details:**
+
 - Host: `mysql-service` (within cluster)
 - Port: `3306`
 - Database: `client_db`
@@ -164,10 +177,12 @@ Comprehensive documentation is available in the `docs/` directory:
 ## Scaling
 
 **Current**: Single MySQL instance
+
 - Sufficient for <100 qps
 - 2 auth-service replicas
 
 **Future**: Add read replicas when:
+
 - Query rate >500 qps
 - Auth-service scaled to >5 replicas
 - Read latency >10ms
@@ -189,6 +204,7 @@ make migrate   # Run schema migrations
 ## Contributing
 
 This repository follows the structure and conventions of the recipe-database project:
+
 - Hierarchical script organization
 - Numbered schema files for ordered execution
 - Job-based operations for Kubernetes-native workflows
@@ -197,21 +213,27 @@ This repository follows the structure and conventions of the recipe-database pro
 ## Troubleshooting
 
 ### Pod won't start
+
 Check logs and resource availability:
+
 ```bash
 kubectl describe pod mysql-0 -n $NAMESPACE
 kubectl logs mysql-0 -n $NAMESPACE
 ```
 
 ### Auth-service can't connect
+
 Verify service and credentials:
+
 ```bash
 kubectl get svc mysql-service -n $NAMESPACE
 kubectl get secret mysql-secrets -n $NAMESPACE -o yaml
 ```
 
 ### Backup fails
+
 Check hostPath accessibility and disk space:
+
 ```bash
 ls -lh db/data/backups/
 df -h

@@ -1,0 +1,88 @@
+# YAML Lint configuration
+# See https://yamllint.readthedocs.io/en/stable/configuration.html
+
+extends: default
+
+rules:
+  # Line length
+  line-length:
+    max: 120
+    level: warning
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
+  # Indentation
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Comments
+  comments:
+    min-spaces-from-content: 1
+    require-starting-space: true
+    ignore-shebangs: true
+
+  # Comments indentation
+  comments-indentation: enable
+
+  # Document start (---)
+  document-start: disable
+
+  # Document end (...)
+  document-end: disable
+
+  # Empty lines
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 0
+
+  # Empty values
+  empty-values:
+    forbid-in-block-mappings: false
+    forbid-in-flow-mappings: true
+
+  # Hyphens
+  hyphens:
+    max-spaces-after: 1
+
+  # Key duplicates
+  key-duplicates: enable
+
+  # Key ordering
+  key-ordering: disable
+
+  # New line at end of file
+  new-line-at-end-of-file: enable
+
+  # New lines
+  new-lines:
+    type: unix
+
+  # Octal values
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+
+  # Quoted strings
+  quoted-strings:
+    quote-type: any
+    required: only-when-needed
+    extra-required: []
+    extra-allowed: []
+
+  # Trailing spaces
+  trailing-spaces: enable
+
+  # Truthy values
+  truthy:
+    allowed-values: ["true", "false", "yes", "no", "on", "off"]
+    check-keys: true
+
+# Ignore patterns
+ignore: |
+  .git/
+  node_modules/
+  db/data/backups/
+  db/data/exports/

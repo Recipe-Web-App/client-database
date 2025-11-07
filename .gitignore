@@ -174,3 +174,6 @@ test-backups/
 # Example/template directory (keep .gitkeep files)
 **/examples/*
 !**/examples/.gitkeep
+
+# Pre-Commit data
+.pre-commit-trivy-cache/

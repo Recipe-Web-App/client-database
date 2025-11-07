@@ -1,0 +1,30 @@
+# Gitleaks ignore patterns
+# Use this file to exclude false positives from secret scanning
+# See https://github.com/gitleaks/gitleaks#gitleaksignore
+
+# Example patterns (uncomment and modify as needed):
+
+# Ignore specific files
+# docs/examples/sample-config.yaml:1
+
+# Ignore specific commit SHAs
+# commit:a1b2c3d4e5f6
+
+# Ignore specific fingerprints (gitleaks will show these in output)
+# fingerprint:12345678
+
+# Common false positives to ignore:
+
+# Example configuration files with placeholder secrets
+# k8s/secret.yaml.example:*
+# .env.example:*
+
+# Test fixtures with fake credentials
+# db/fixtures/*:*
+
+# Documentation with example credentials
+# docs/*:generic-api-key
+
+# If you need to ignore a specific line, run gitleaks and it will show you the fingerprint
+# Then add the fingerprint here with a comment explaining why it's safe:
+# fingerprint:abc123def456  # This is a test API key, not a real secret

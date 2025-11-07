@@ -1,14 +1,17 @@
 # Client Database - System Architecture
 
-This document describes the system architecture, technology choices, deployment strategy, and design rationale for the client-database service.
+This document describes the system architecture, technology choices, deployment strategy, and design rationale for the
+client-database service.
 
 ## Overview
 
-The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 client credentials for the auth-service. It provides persistent storage for client authentication data with a focus on read performance and operational simplicity.
+The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 client credentials for the auth-service.
+It provides persistent storage for client authentication data with a focus on read performance and operational
+simplicity.
 
 ## System Components
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Kubernetes Cluster                          │
 │                                                                 │
@@ -44,7 +47,9 @@ The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 c
 ## Technology Stack
 
 ### Database: MySQL 8.0
+
 **Choice Rationale:**
+
 - ✅ **Read-optimized**: Fastest performance for simple key-value lookups
 - ✅ **Network protocol**: Standard TCP connections, no shared filesystem
 - ✅ **Low memory**: ~2MB per connection vs ~10MB for PostgreSQL
@@ -53,28 +58,33 @@ The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 c
 - ✅ **Proven at scale**: Used by thousands of production systems
 
 **Why not SQLite?**
+
 - ❌ Requires shared filesystem (node affinity constraints)
 - ❌ WAL mode requires shared memory (no network support)
 - ❌ Complex backup/restore with multiple readers
 
 **Why not PostgreSQL?**
+
 - ✅ PostgreSQL is also excellent, but MySQL is faster for simple reads
 - ✅ MySQL uses less memory per connection
 - ✅ MySQL is simpler for this use case (no advanced features needed)
 
 ### Storage Engine: InnoDB
+
 - ACID compliance for data integrity
 - Row-level locking for concurrent reads
 - Transparent data encryption support
 - Crash recovery capabilities
 
 ### Deployment Platform: Kubernetes
+
 - **StatefulSet**: Stable network identity, persistent storage
 - **PersistentVolumeClaim**: Durable storage for database files
 - **Service**: Stable DNS endpoint for database connections
 - **Jobs**: One-time operations (backup, restore, migrations)
 
 ### Migration Tool: golang-migrate
+
 - Simple, SQL-based migrations
 - Up/down migration support
 - Version tracking in database
@@ -83,9 +93,11 @@ The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 c
 ## Architecture Decisions
 
 ### 1. Single StatefulSet Replica
+
 **Decision**: Deploy MySQL as a single-replica StatefulSet
 
 **Rationale:**
+
 - **Current scale**: 2 auth-service replicas, low query volume (<100 qps)
 - **Read-heavy**: Writes are rare (only client registration/updates)
 - **Simplicity**: No replication complexity, no sync issues
@@ -93,15 +105,18 @@ The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 c
 - **Future**: Can add read replicas when scale requires it
 
 **Trade-offs:**
+
 - ⚠️ Single point of failure during upgrades
 - ⚠️ Downtime during pod restarts (~30 seconds)
 - ✅ Acceptable for internal service (not user-facing)
 - ✅ Can enable HA later with read replicas
 
 ### 2. Job-Based Operations
+
 **Decision**: Use Kubernetes Jobs for backup/restore/migrations
 
 **Rationale:**
+
 - **Cluster-native**: Operations run inside Kubernetes
 - **No external dependencies**: No need for external cron jobs or scripts
 - **Direct access**: Jobs access PVCs directly, no network overhead
@@ -109,29 +124,35 @@ The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 c
 - **Manual control**: Triggered explicitly, not automated
 
 **Operations via Jobs:**
+
 - Backup: mysqldump to backup PVC
 - Restore: mysql import from backup PVC
 - Schema load: Execute db/init/schema/*.sql files
 - Migrations: Run golang-migrate
 
 ### 3. Template-Based Configuration
+
 **Decision**: Use envsubst for Kubernetes manifest templates
 
 **Rationale:**
+
 - **No hardcoded secrets**: Passwords never committed to git
 - **Environment-specific**: Different values for dev/staging/prod
 - **Simple**: envsubst is standard and well-understood
 - **Follows recipe-database pattern**: Consistent with existing repos
 
 **Template Files:**
+
 - `k8s/secret-template.yaml` - Credentials and passwords
 - `k8s/configmap-template.yaml` - MySQL configuration
 - `db/init/users/*-template.sql` - User creation scripts
 
 ### 4. hostPath Backup Strategy
+
 **Decision**: Use hostPath volume to write backups directly to local repository
 
 **Rationale:**
+
 - **Simplicity**: No separate PVC for backups
 - **Version control**: Backups stored in repo alongside code
 - **Cost**: Zero additional storage costs
@@ -139,24 +160,29 @@ The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 c
 - **Portability**: Easy to copy/move backups
 
 **Storage:**
+
 1. **client-db-pvc**: Database files (/var/lib/mysql)
 2. **hostPath volume**: Backups written to `db/data/backups/` in repository
 
 **Implementation:**
+
 - Backup/restore Jobs dynamically mount repository path via hostPath
 - Scripts pass absolute repo path to Job via environment variable
 - ConfigMap or Job spec updated before each backup/restore operation
 
 ### 5. Hierarchical Script Organization
+
 **Decision**: Organize scripts by operational domain
 
 **Rationale:**
+
 - **Discoverability**: Easy to find related scripts
 - **Separation of concerns**: Container ops vs database ops
 - **Reduced clutter**: Smaller directories, cleaner structure
 - **Follows recipe-database**: Consistent with existing repos
 
 **Directories:**
+
 - `scripts/containerManagement/` - Kubernetes operations
 - `scripts/dbManagement/` - Database operations
 - `scripts/jobHelpers/` - Scripts for Job pods
@@ -167,6 +193,7 @@ The client-database is a Kubernetes-deployed MySQL database that stores OAuth2 c
 ### Kubernetes Resources
 
 #### StatefulSet: mysql
+
 ```yaml
 apiVersion: apps/v1
 kind: StatefulSet
@@ -214,6 +241,7 @@ spec:
 ```
 
 #### Service: mysql-service
+
 ```yaml
 apiVersion: v1
 kind: Service
@@ -230,6 +258,7 @@ spec:
 ```
 
 #### ConfigMap: mysql-config
+
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -247,6 +276,7 @@ data:
 ```
 
 #### Secret: mysql-secrets
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -265,6 +295,7 @@ stringData:
 ### Auth-Service to MySQL
 
 **Connection Details:**
+
 - **Protocol**: MySQL protocol over TCP
 - **Host**: `mysql-service.default.svc.cluster.local` (or just `mysql-service` in same namespace)
 - **Port**: 3306
@@ -272,6 +303,7 @@ stringData:
 - **Connection pooling**: Configured in auth-service application
 
 **Go Connection Example:**
+
 ```go
 import (
     "database/sql"
@@ -300,11 +332,13 @@ db.SetConnMaxLifetime(5 * time.Minute)
 ### Connection Pooling Strategy
 
 **Settings:**
+
 - **MaxOpenConns**: 25 (sufficient for 2 auth-service replicas)
 - **MaxIdleConns**: 10 (keep warm connections)
 - **ConnMaxLifetime**: 5 minutes (recycle connections)
 
 **Rationale:**
+
 - 2 auth-service pods × 10 connections each = 20 connections maximum
 - MySQL configured for 50 max connections (headroom for admin)
 - Idle connections reduce latency on new requests
@@ -312,11 +346,13 @@ db.SetConnMaxLifetime(5 * time.Minute)
 ## Security Architecture
 
 ### Network Security
+
 - **ClusterIP Service**: MySQL only accessible within Kubernetes cluster
 - **No external exposure**: No LoadBalancer or NodePort
 - **Optional**: Network policies to restrict access to auth-service pods only
 
 ### Authentication & Authorization
+
 - **MySQL Users**:
   1. `root` - Administrative operations (migrations, user management)
   2. `client_db_user` - Application user (SELECT, INSERT, UPDATE)
@@ -328,11 +364,13 @@ db.SetConnMaxLifetime(5 * time.Minute)
   - Rotated via Secret updates
 
 ### Encryption
+
 - **In-transit**: TLS/SSL connections (optional but recommended)
 - **At-rest**: InnoDB transparent encryption or encrypted PVC
 - **Application-level**: bcrypt hashing for client_secret field
 
 ### Secret Hashing
+
 - **Algorithm**: bcrypt with cost factor 10
 - **Library**: `golang.org/x/crypto/bcrypt`
 - **Storage**: Only hashes stored, never plaintext
@@ -345,6 +383,7 @@ db.SetConnMaxLifetime(5 * time.Minute)
 **Method**: Kubernetes Job running mysqldump with hostPath volume
 
 **Process:**
+
 1. User triggers: `./scripts/dbManagement/backup-db.sh`
 2. Script detects absolute path to repository (`$PROJECT_ROOT`)
 3. Script creates Job from template with:
@@ -357,12 +396,14 @@ db.SetConnMaxLifetime(5 * time.Minute)
 6. Job completes, backup stored in repository's `db/data/backups/`
 
 **Backup Storage:**
+
 - **Location**: Repository directory `db/data/backups/`
 - **Format**: Gzipped SQL dump
 - **Naming**: `clients-YYYYMMDD-HHMMSS.sql.gz`
 - **Retention**: Manual (gitignored, manage locally)
 
 **Advantages:**
+
 - No separate PVC needed (zero storage costs)
 - Backups immediately accessible on local filesystem
 - Can commit backups to version control if desired (though not recommended)
@@ -374,6 +415,7 @@ db.SetConnMaxLifetime(5 * time.Minute)
 **Method**: Kubernetes Job running mysql import with hostPath volume
 
 **Process:**
+
 1. User triggers: `./scripts/dbManagement/restore-db.sh <backup-file>`
 2. Script verifies backup file exists in `db/data/backups/`
 3. Script scales MySQL StatefulSet to 0 (graceful shutdown)
@@ -388,6 +430,7 @@ db.SetConnMaxLifetime(5 * time.Minute)
 9. Script verifies database health
 
 **Safety Measures:**
+
 - Backup file existence verified locally before Job creation
 - MySQL scaled down before restore (prevents corruption)
 - Restore Job runs with retries on failure
@@ -399,6 +442,7 @@ db.SetConnMaxLifetime(5 * time.Minute)
 ### Health Checks
 
 **Liveness Probe:**
+
 ```yaml
 livenessProbe:
   exec:
@@ -410,6 +454,7 @@ livenessProbe:
 ```
 
 **Readiness Probe:**
+
 ```yaml
 readinessProbe:
   exec:
@@ -424,11 +469,13 @@ readinessProbe:
 ```
 
 ### Metrics (Future Enhancement)
+
 - **mysql_exporter**: Prometheus exporter sidecar
 - **ServiceMonitor**: Prometheus auto-discovery
 - **Grafana Dashboard**: MySQL overview dashboard
 
 **Metrics to track:**
+
 - Connection count
 - Query rate (reads vs writes)
 - Slow query count
@@ -436,6 +483,7 @@ readinessProbe:
 - Active clients count
 
 ### Logging
+
 - **MySQL slow query log**: Queries taking >2 seconds
 - **Application logs**: Auth-service connection errors
 - **Job logs**: Backup/restore operation logs
@@ -443,33 +491,41 @@ readinessProbe:
 ## Scaling Strategy
 
 ### Current: Single Instance
+
 - **Sufficient for**: <100 qps, 2 auth-service replicas
 - **Bottleneck**: Single MySQL instance
 
 ### Future: Read Replicas
+
 **When to add read replicas:**
+
 - Query rate >500 qps
 - Auth-service scaled to >5 replicas
 - Read latency >10ms
 
 **Implementation:**
+
 1. Configure MySQL replication
 2. Deploy read-replica StatefulSet
 3. Add read-only Service pointing to replicas
 4. Update auth-service to use read/write split
 
 ### Future: Managed MySQL
+
 **When to migrate:**
+
 - Need for high availability (>99.9% uptime)
 - Team lacks MySQL operational expertise
 - Want automated backups, patching, monitoring
 
 **Options:**
+
 - AWS RDS for MySQL
 - Google Cloud SQL for MySQL
 - Azure Database for MySQL
 
 **Migration:**
+
 1. Export data: `mysqldump`
 2. Create managed instance
 3. Import data
@@ -479,31 +535,37 @@ readinessProbe:
 ## Disaster Recovery
 
 ### Recovery Time Objective (RTO)
+
 - **Target**: <10 minutes
 - **Process**: Restore from latest backup
 
 ### Recovery Point Objective (RPO)
+
 - **Target**: <24 hours (depends on backup frequency)
 - **Recommendation**: Daily backups minimum
 
 ### Disaster Scenarios
 
 #### 1. Pod Crash
+
 - **Auto-recovery**: Kubernetes restarts pod automatically
 - **Data**: Persisted on PVC, no data loss
 - **Downtime**: ~30 seconds
 
 #### 2. PVC Corruption
+
 - **Recovery**: Restore from backup PVC
 - **Downtime**: ~10 minutes
 - **Data loss**: Since last backup
 
 #### 3. Complete Cluster Failure
+
 - **Recovery**: Deploy to new cluster, restore from backup
 - **Requirement**: Backups stored outside cluster
 - **Recommendation**: Periodic backup exports to S3/external storage
 
 #### 4. Accidental DELETE
+
 - **Recovery**: Restore specific table from backup
 - **Process**: Extract table from backup dump, import
 - **Recommendation**: Use soft deletes (`is_active` flag) instead
@@ -513,24 +575,29 @@ readinessProbe:
 ### Expected Performance
 
 **Read Operations:**
+
 - **Primary key lookup**: <5ms (99th percentile)
 - **Indexed query**: <10ms
 - **Full table scan**: <50ms (small table size)
 
 **Write Operations:**
+
 - **INSERT**: <10ms
 - **UPDATE**: <15ms (includes index updates)
 
 **Throughput:**
+
 - **Reads**: 100-1000 qps (single instance)
 - **Writes**: 50-100 qps (sufficient for this use case)
 
 ### Bottlenecks
+
 - **Single instance**: No horizontal read scaling
 - **Disk I/O**: PVC performance limits throughput
 - **Network**: Kubernetes network latency (~1-2ms)
 
 ### Optimization Techniques
+
 - **Connection pooling**: Reuse connections
 - **Prepared statements**: Faster query execution
 - **Indexes**: Fast lookups on `client_id`, `is_active`
@@ -539,16 +606,19 @@ readinessProbe:
 ## Operational Runbook
 
 ### Daily Operations
+
 - **Backups**: Trigger manual backup weekly
 - **Monitoring**: Check metrics dashboard
 - **Logs**: Review slow query log
 
 ### Weekly Operations
+
 - **Cleanup**: Remove old backup files (>30 days)
 - **Job cleanup**: Delete completed Job pods
 - **Health check**: Run verification script
 
 ### Monthly Operations
+
 - **Performance review**: Check query performance
 - **Backup test**: Verify restore procedure
 - **Security audit**: Review user permissions

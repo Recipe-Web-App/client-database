@@ -1,0 +1,141 @@
+# Markdownlint configuration
+# See https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+# Default state for all rules
+default: true
+
+# Heading style (MD003)
+MD003:
+  style: atx # Use # style headings
+
+# Unordered list style (MD004)
+MD004:
+  style: dash # Use - for unordered lists
+
+# Unordered list indentation (MD007)
+MD007:
+  indent: 2
+
+# Line length (MD013)
+MD013:
+  line_length: 120
+  heading_line_length: 120
+  code_blocks: false # Don't check line length in code blocks
+  tables: false # Don't check line length in tables
+  headings: true
+  strict: false
+  stern: false
+
+# Multiple consecutive blank lines (MD012)
+MD012:
+  maximum: 2
+
+# Hard tabs (MD010)
+MD010:
+  code_blocks: false # Allow tabs in code blocks
+  spaces_per_tab: 2
+
+# Reversed link syntax (MD011)
+MD011: true
+
+# Multiple headings with the same content (MD024)
+MD024:
+  siblings_only: true # Only flag if siblings have same content
+
+# Multiple top-level headings (MD025)
+MD025:
+  level: 1
+  front_matter_title: ""
+
+# Trailing punctuation in heading (MD026)
+MD026:
+  punctuation: .,;:!
+
+# Multiple spaces after blockquote symbol (MD027)
+MD027: true
+
+# Blank line inside blockquote (MD028)
+MD028: true
+
+# Ordered list item prefix (MD029)
+MD029:
+  style: one_or_ordered # Allow both 1/1/1 and 1/2/3 styles
+
+# Spaces after list markers (MD030)
+MD030:
+  ul_single: 1
+  ol_single: 1
+  ul_multi: 1
+  ol_multi: 1
+
+# Fenced code blocks should be surrounded by blank lines (MD031)
+MD031:
+  list_items: true
+
+# Lists should be surrounded by blank lines (MD032)
+MD032: true
+
+# Inline HTML (MD033)
+MD033:
+  allowed_elements: [] # Allow HTML if needed
+
+# Bare URLs without angle brackets (MD034)
+MD034: false # Allow bare URLs
+
+# Horizontal rule style (MD035)
+MD035:
+  style: ---
+
+# Emphasis marker style (MD036)
+MD036: true
+
+# Spaces inside emphasis markers (MD037)
+MD037: true
+
+# Spaces inside code span elements (MD038)
+MD038: true
+
+# Spaces inside link text (MD039)
+MD039: true
+
+# Fenced code blocks should have a language specified (MD040)
+MD040: true
+
+# First line in file should be a top-level heading (MD041)
+MD041: true
+
+# No empty links (MD042)
+MD042: true
+
+# Required heading structure (MD043)
+MD043: false # Don't enforce specific heading structure
+
+# Proper names should have correct capitalization (MD044)
+MD044:
+  names: [] # Add proper names if needed
+  code_blocks: false
+
+# Images should have alternate text (MD045)
+MD045: true
+
+# Code block style (MD046)
+MD046:
+  style: fenced # Use ``` for code blocks
+
+# Files should end with a single newline character (MD047)
+MD047: true
+
+# Code fence style (MD048)
+MD048:
+  style: backtick # Use ``` not ~~~
+
+# Emphasis style should be consistent (MD049)
+MD049:
+  style: asterisk # Use * for emphasis
+
+# Strong style should be consistent (MD050)
+MD050:
+  style: asterisk # Use ** for strong
+
+# Link fragments should be valid (MD051)
+MD051: true

@@ -1,10 +1,12 @@
 # Client Database - Database Design
 
-This document describes the MySQL database schema, design rationale, and implementation details for the OAuth2 client credentials storage system.
+This document describes the MySQL database schema, design rationale, and implementation details for the OAuth2 client
+credentials storage system.
 
 ## Overview
 
 The client database stores OAuth2 client credentials for the auth-service. It is optimized for:
+
 - **Read-heavy workload**: Frequent credential lookups during authentication
 - **Light writes**: Infrequent client registration/updates
 - **Fast lookups**: Indexed queries on client_id (primary key)
@@ -13,6 +15,7 @@ The client database stores OAuth2 client credentials for the auth-service. It is
 ## Database Configuration
 
 ### MySQL Version
+
 - **Version**: MySQL 8.0+
 - **Engine**: InnoDB (for ACID compliance and row-level locking)
 - **Character Set**: utf8mb4
@@ -21,6 +24,7 @@ The client database stores OAuth2 client credentials for the auth-service. It is
 ### Why MySQL over SQLite/PostgreSQL?
 
 **Advantages for this use case:**
+
 1. **Network connections** - No shared filesystem complexity
 2. **Read performance** - Optimized for simple, fast reads
 3. **Low memory footprint** - ~2MB per connection vs ~10MB for PostgreSQL
@@ -41,6 +45,7 @@ COLLATE utf8mb4_unicode_ci;
 ### Table: `oauth2_clients`
 
 #### Purpose
+
 Stores OAuth2 client credentials and metadata for service-to-service authentication.
 
 #### Schema Definition
@@ -99,6 +104,7 @@ CREATE INDEX idx_name ON oauth2_clients(client_name);
 ## Field Descriptions
 
 ### `client_id` (VARCHAR(255), PRIMARY KEY)
+
 - **Purpose**: Unique identifier for the OAuth2 client
 - **Format**: String, typically UUID or human-readable slug
 - **Examples**: `auth-service-prod`, `mobile-app-v1`, `b8f3c2a4-5d6e-4f7a-8b9c-0d1e2f3a4b5c`
@@ -106,6 +112,7 @@ CREATE INDEX idx_name ON oauth2_clients(client_name);
 - **Lookup Performance**: O(log n) via B-tree index
 
 ### `client_secret_hash` (VARCHAR(255), NOT NULL)
+
 - **Purpose**: Secure storage of client secret
 - **Format**: bcrypt hash (60 characters, but allow 255 for future algorithms)
 - **Security**: Never store plaintext secrets
@@ -114,6 +121,7 @@ CREATE INDEX idx_name ON oauth2_clients(client_name);
 - **Example**: `$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy`
 
 ### `client_name` (VARCHAR(255), NOT NULL)
+
 - **Purpose**: Human-readable name for the client
 - **Format**: Free text
 - **Examples**: `Production Auth Service`, `Mobile App v2.1`, `Internal Admin Tool`
@@ -121,6 +129,7 @@ CREATE INDEX idx_name ON oauth2_clients(client_name);
 - **Use Case**: Admin UI display, logging, auditing
 
 ### `grant_types` (JSON, NOT NULL)
+
 - **Purpose**: OAuth2 grant types allowed for this client
 - **Format**: JSON array of strings
 - **Examples**:
@@ -130,6 +139,7 @@ CREATE INDEX idx_name ON oauth2_clients(client_name);
 - **Validation**: Application layer validates grant type requests
 
 ### `scopes` (JSON, NOT NULL)
+
 - **Purpose**: Permissions/scopes the client is allowed to request
 - **Format**: JSON array of strings
 - **Examples**:
@@ -139,6 +149,7 @@ CREATE INDEX idx_name ON oauth2_clients(client_name);
 - **Validation**: Auth-service validates requested scopes against this list
 
 ### `redirect_uris` (JSON, NULL)
+
 - **Purpose**: Allowed redirect URIs for authorization code flow
 - **Format**: JSON array of URLs
 - **Examples**: `["https://app.example.com/callback", "https://staging.example.com/callback"]`
@@ -146,31 +157,37 @@ CREATE INDEX idx_name ON oauth2_clients(client_name);
 - **Validation**: Must match exactly during OAuth2 flow
 
 ### `is_active` (BOOLEAN, DEFAULT TRUE)
+
 - **Purpose**: Soft delete / enable-disable clients
 - **Values**: `TRUE` (active), `FALSE` (inactive)
 - **Indexed**: Yes (for filtering active clients)
 - **Use Case**: Disable compromised clients without deleting records
 
 ### `created_at` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP)
+
 - **Purpose**: Record creation timestamp
 - **Auto-set**: Yes, on INSERT
 - **Use Case**: Auditing, debugging, analytics
 
 ### `updated_at` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)
+
 - **Purpose**: Last modification timestamp
 - **Auto-update**: Yes, on UPDATE
 - **Use Case**: Auditing, cache invalidation, debugging
 
 ### `created_by` (VARCHAR(255), NULL)
+
 - **Purpose**: Track who/what created this client
 - **Format**: Username, service name, or system identifier
 - **Examples**: `admin@example.com`, `registration-api`, `terraform`
 - **Use Case**: Auditing, compliance, debugging
 
 ### `metadata` (JSON, NULL)
+
 - **Purpose**: Extensible field for additional data
 - **Format**: JSON object
 - **Examples**:
+
   ```json
   {
     "environment": "production",
@@ -179,11 +196,13 @@ CREATE INDEX idx_name ON oauth2_clients(client_name);
     "notes": "Production auth service client"
   }
   ```
+
 - **Use Case**: Future extensibility without schema changes
 
 ## Sample Data
 
 ### Example 1: Service-to-Service Client
+
 ```sql
 INSERT INTO oauth2_clients (
     client_id,
@@ -209,6 +228,7 @@ INSERT INTO oauth2_clients (
 ```
 
 ### Example 2: User-Facing Application
+
 ```sql
 INSERT INTO oauth2_clients (
     client_id,
@@ -238,35 +258,42 @@ INSERT INTO oauth2_clients (
 ### Common Queries (Optimized)
 
 #### 1. Lookup Client by ID (Primary Use Case)
+
 ```sql
 SELECT * FROM oauth2_clients
 WHERE client_id = 'api-gateway-prod'
 AND is_active = TRUE;
 ```
+
 - **Performance**: O(log n) - primary key lookup
 - **Index Used**: PRIMARY KEY (clustered index)
 - **Expected QPS**: 100-1000 (read-heavy workload)
 
 #### 2. List All Active Clients
+
 ```sql
 SELECT client_id, client_name, scopes, created_at
 FROM oauth2_clients
 WHERE is_active = TRUE
 ORDER BY created_at DESC;
 ```
+
 - **Performance**: Uses `idx_active` index
 - **Use Case**: Admin UI, monitoring
 
 #### 3. Search Clients by Name
+
 ```sql
 SELECT client_id, client_name, is_active
 FROM oauth2_clients
 WHERE client_name LIKE '%gateway%';
 ```
+
 - **Performance**: Uses `idx_name` index for prefix search
 - **Use Case**: Admin search functionality
 
 #### 4. Count Active Clients (Monitoring)
+
 ```sql
 SELECT
     COUNT(*) as total_clients,
@@ -274,11 +301,13 @@ SELECT
     SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) as inactive_clients
 FROM oauth2_clients;
 ```
+
 - **Use Case**: Health checks, metrics
 
 ## Performance Considerations
 
 ### Read Optimization
+
 - **Primary key lookups**: O(log n) via clustered B-tree index
 - **Indexed columns**: `is_active`, `client_name` for fast filtering
 - **Small row size**: Minimal overhead per row
@@ -286,12 +315,14 @@ FROM oauth2_clients;
 - **Query cache**: MySQL query cache enabled (if applicable)
 
 ### Write Optimization
+
 - **Infrequent writes**: Optimized for reads, writes are rare
 - **InnoDB**: Row-level locking prevents contention
 - **Batch inserts**: Use multi-row INSERT for bulk operations
 - **No triggers**: Simple schema, no overhead
 
 ### Expected Performance
+
 - **Reads**: <5ms for primary key lookup
 - **Writes**: <10ms for INSERT/UPDATE
 - **Concurrent reads**: 100+ queries/second per replica
@@ -300,20 +331,24 @@ FROM oauth2_clients;
 ## Security
 
 ### Secret Storage
+
 - **Never store plaintext secrets**: Always bcrypt hash
 - **Hashing algorithm**: bcrypt with cost factor 10-12
 - **Go library**: `golang.org/x/crypto/bcrypt`
 - **Example**:
+
   ```go
   hash, err := bcrypt.GenerateFromPassword([]byte(secret), 10)
   ```
 
 ### Connection Security
+
 - **TLS/SSL**: Enable encrypted connections between auth-service and MySQL
 - **User permissions**: Separate users for app (read/write) and backup (read-only)
 - **Network policies**: Restrict MySQL access to auth-service pods only
 
 ### Encryption at Rest
+
 - **InnoDB encryption**: Use MySQL 8.0+ transparent data encryption
 - **Key management**: Store encryption keys in Kubernetes Secrets
 - **PVC encryption**: Alternatively, use cloud provider encrypted volumes
@@ -321,26 +356,31 @@ FROM oauth2_clients;
 ## Database Users
 
 ### Application User
+
 ```sql
 CREATE USER IF NOT EXISTS 'client_db_user'@'%' IDENTIFIED BY '<password>';
 GRANT SELECT, INSERT, UPDATE ON client_db.* TO 'client_db_user'@'%';
 FLUSH PRIVILEGES;
 ```
+
 - **Purpose**: Auth-service database access
 - **Permissions**: SELECT, INSERT, UPDATE (no DELETE)
 - **Use**: Normal application operations
 
 ### Backup User
+
 ```sql
 CREATE USER IF NOT EXISTS 'backup_user'@'%' IDENTIFIED BY '<password>';
 GRANT SELECT, LOCK TABLES, SHOW VIEW ON client_db.* TO 'backup_user'@'%';
 FLUSH PRIVILEGES;
 ```
+
 - **Purpose**: Database backups
 - **Permissions**: Read-only + lock tables
 - **Use**: mysqldump operations
 
 ### Root User
+
 - **Purpose**: Schema changes, user management
 - **Permissions**: Full administrative access
 - **Use**: Migrations, administrative tasks
@@ -349,6 +389,7 @@ FLUSH PRIVILEGES;
 ## Schema Evolution
 
 ### Migration Strategy
+
 - **Tool**: golang-migrate
 - **Version control**: Numbered migration files (000001, 000002, etc.)
 - **Up migrations**: Apply changes
@@ -356,7 +397,9 @@ FLUSH PRIVILEGES;
 - **Execution**: Via Kubernetes Jobs
 
 ### Future Schema Changes
+
 Potential future additions:
+
 - **Token tracking**: Store issued tokens for revocation
 - **Rate limiting**: Add rate limit fields per client
 - **Audit log**: Separate table for access logs
@@ -366,6 +409,7 @@ Potential future additions:
 ## Monitoring Queries
 
 ### Health Check
+
 ```sql
 SELECT
     COUNT(*) as total_clients,
@@ -376,6 +420,7 @@ FROM oauth2_clients;
 ```
 
 ### Audit Query
+
 ```sql
 SELECT
     client_id,
@@ -391,12 +436,14 @@ ORDER BY updated_at DESC;
 ## Comparison to Alternatives
 
 ### vs SQLite
+
 - ✅ Network connections (no shared filesystem)
 - ✅ Better for multiple readers (2 auth-service pods)
 - ✅ Easier to scale (add read replicas)
 - ❌ Slightly more complex deployment
 
 ### vs PostgreSQL
+
 - ✅ Faster simple reads (2-3x for key-value lookups)
 - ✅ Lower memory footprint (~2MB vs ~10MB per connection)
 - ❌ Fewer advanced features (row-level security, etc.)
@@ -420,7 +467,7 @@ ORDER BY updated_at DESC;
 
 ## Entity Relationship Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        oauth2_clients                            │
 ├─────────────────────────────────────────────────────────────────┤

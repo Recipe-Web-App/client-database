@@ -1,10 +1,11 @@
 # Client Database - Repository Structure
 
-This document outlines the complete directory structure and file organization for the client-database repository, mirroring the structure of the recipe-database repository.
+This document outlines the complete directory structure and file organization for the client-database repository,
+mirroring the structure of the recipe-database repository.
 
 ## Directory Tree
 
-```
+```text
 client-database/
 ├── db/                              # Database content and initialization
 │   ├── init/                        # Database initialization files
@@ -83,73 +84,88 @@ client-database/
 ## Directory Purposes
 
 ### `db/` - Database Content
+
 Contains all database-related files including schema definitions, user creation scripts, test data, and queries.
 
-**db/init/schema/**
+#### db/init/schema/
+
 - Numbered SQL files for ordered schema creation
 - Files execute in numerical order (001, 002, 003, etc.)
 - Each file is idempotent and can be re-run safely
 
-**db/init/users/**
+#### db/init/users/
+
 - Template files for creating database users
 - Uses `envsubst` for environment variable substitution
 - Separate users for application and backup operations
 
-**db/fixtures/**
+#### db/fixtures/
+
 - Test data for development and testing
 - Numbered files for dependency ordering
 - bcrypt-hashed passwords for OAuth2 secrets
 
-**db/data/**
+#### db/data/
+
 - Local storage for backups and exports
 - Subdirectories: `backups/` and `exports/`
 - Gitignored to prevent committing sensitive data
 
-**db/queries/monitoring/**
+#### db/queries/monitoring/
+
 - Reusable SQL queries
 - Health check queries for monitoring
 - Performance and diagnostic queries
 
 ### `scripts/` - Operational Scripts
+
 Hierarchically organized scripts for different operational domains.
 
-**scripts/containerManagement/**
+#### scripts/containerManagement/
+
 - Kubernetes and Docker operations
 - Deploy, start, stop, update, status, cleanup
 - Infrastructure management scripts
 
-**scripts/dbManagement/**
+#### scripts/dbManagement/
+
 - Database-specific operations
 - Schema loading, backups, restores, migrations
 - Direct interaction with MySQL
 
-**scripts/jobHelpers/**
+#### scripts/jobHelpers/
+
 - Scripts designed to run inside Kubernetes Job pods
 - Execute operations within the cluster
 - Mounted into Job containers
 
-**scripts/utils/**
+#### scripts/utils/
+
 - Shared utility functions
 - Common logging, color output, error handling
 - Sourced by other scripts
 
 ### `k8s/` - Kubernetes Manifests
+
 All Kubernetes resource definitions for deploying MySQL.
 
 **Core Resources:**
+
 - `configmap-template.yaml` - MySQL configuration (my.cnf settings)
 - `secret-template.yaml` - Credentials (uses envsubst for substitution)
 - `statefulset.yaml` - MySQL StatefulSet definition
 - `service.yaml` - Service exposing MySQL on port 3306
 - `pvc.yaml` - Persistent volume for database storage
 
-**k8s/jobs/**
+#### k8s/jobs/
+
 - Job templates for one-time operations
 - Backup and restore Jobs use hostPath volumes to mount `db/data/backups/` from repository
 - Schema loading and migration Jobs
 - Triggered manually via scripts, dynamically configured with repository path
 
 ### `migrations/` - Schema Migrations
+
 golang-migrate compatible migration files.
 
 - Up migrations: Apply schema changes
@@ -157,6 +173,7 @@ golang-migrate compatible migration files.
 - Numbered sequentially (000001, 000002, etc.)
 
 ### `docs/` - Documentation
+
 Comprehensive documentation for the repository.
 
 - `architecture.md` - System design, technology choices
@@ -166,6 +183,7 @@ Comprehensive documentation for the repository.
 - `scaling.md` - Future scaling strategies
 
 ### `tools/` - Container Tools
+
 Container images and tools for operations.
 
 - `Dockerfile` - Custom image with MySQL client and migration tools
@@ -174,22 +192,26 @@ Container images and tools for operations.
 ## File Naming Conventions
 
 ### SQL Files
+
 - **Schema files**: `NNN_action_object.sql` (e.g., `001_create_database.sql`)
 - **Fixture files**: `NNN_table_name.sql` (e.g., `001_sample_clients.sql`)
 - **User files**: `NNN_description-template.sql` (for envsubst substitution)
 - **Migration files**: `NNNNNN_description.{up,down}.sql`
 
 ### Shell Scripts
+
 - **All lowercase**: `action-object.sh`
 - **Hyphenated**: Kebab-case for compound words
 - **Descriptive**: Verb-noun pairs (e.g., `deploy-container.sh`, `backup-db.sh`)
 
 ### Kubernetes Manifests
+
 - **Component-type.yaml**: `deployment.yaml`, `service.yaml`, `pvc.yaml`
 - **Templates**: `*-template.yaml` (requires envsubst)
 - **Jobs**: `db-action-target-job.yaml`
 
 ### Documentation
+
 - **All lowercase**: `architecture.md`, `deployment.md`
 - **Hyphenated**: `schema-design.md`
 - **Descriptive**: Clear purpose from filename
@@ -197,6 +219,7 @@ Container images and tools for operations.
 ## Configuration Files
 
 ### Root Level
+
 - `.env.example` - Template with all required environment variables
 - `.env` - Actual values (gitignored, never committed)
 - `.gitignore` - Excludes `.env`, `db/data/`, `*.sql` dumps, backups
@@ -215,7 +238,7 @@ Container images and tools for operations.
 - **tools/**: 1 file (Dockerfile)
 - **root**: 7 files (.env.example, .env, .gitignore, Makefile, README, CLAUDE, CHANGELOG)
 
-**Total: ~54 files**
+Total: ~54 files
 
 ## Design Philosophy
 
@@ -240,4 +263,5 @@ This structure mirrors recipe-database with these adaptations:
 - **golang-migrate** - Instead of custom migration scripts
 - **hostPath backups** - Backups stored in repository using hostPath volumes, not separate PVC
 
-The core organizational principles remain the same: hierarchical scripts, numbered schema files, Job-based operations, and comprehensive documentation.
+The core organizational principles remain the same: hierarchical scripts, numbered schema files, Job-based operations,
+and comprehensive documentation.
