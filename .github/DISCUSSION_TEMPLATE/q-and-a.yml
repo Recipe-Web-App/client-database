@@ -1,0 +1,43 @@
+labels: [question]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask questions about the project!
+
+  - type: textarea
+    attributes:
+      label: Question
+      description: What would you like to know?
+      placeholder: Your question...
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Topic Area
+      description: What is your question about?
+      options:
+        - Database Schema
+        - Kubernetes Deployment
+        - Configuration
+        - Shell Scripts
+        - Docker
+        - General Usage
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Context
+      description: Provide any relevant context
+      placeholder: What have you tried? What are you trying to accomplish?
+
+  - type: textarea
+    attributes:
+      label: Relevant Configuration
+      description: Share relevant configuration or code snippets
+      placeholder: Paste any relevant configuration...
+      render: yaml

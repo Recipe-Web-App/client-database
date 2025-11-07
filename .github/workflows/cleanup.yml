@@ -1,0 +1,61 @@
+name: Branch Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Delete Merged Branches
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    permissions:
+      contents: write
+    steps:
+      - name: Delete merged branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const protectedBranches = ['main', 'master', 'develop', 'staging', 'production'];
+            const releasePattern = /^(release|hotfix)\//;
+
+            // Don't delete protected branches
+            if (protectedBranches.includes(branch)) {
+              console.log(`Skipping deletion of protected branch: ${branch}`);
+              return;
+            }
+
+            // Don't delete release/hotfix branches
+            if (releasePattern.test(branch)) {
+              console.log(`Skipping deletion of release/hotfix branch: ${branch}`);
+              return;
+            }
+
+            // Don't delete branches from forks
+            if (context.payload.pull_request.head.repo.fork) {
+              console.log(`Skipping deletion of fork branch: ${branch}`);
+              return;
+            }
+
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `heads/${branch}`
+              });
+              console.log(`Successfully deleted branch: ${branch}`);
+
+              // Comment on PR
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `🗑️ Branch \`${branch}\` has been automatically deleted after merge.`
+              });
+            } catch (error) {
+              console.log(`Error deleting branch: ${error.message}`);
+            }

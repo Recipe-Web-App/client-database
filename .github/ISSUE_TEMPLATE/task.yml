@@ -1,0 +1,97 @@
+name: Task
+description: Create a development task
+title: "[Task]: "
+labels: [task]
+assignees:
+  - jsamuelsen11
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Task Description
+      description: Describe the task to be completed
+      placeholder: What needs to be done?...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Task Type
+      description: What type of task is this?
+      options:
+        - Implementation
+        - Refactoring
+        - Technical Debt
+        - Infrastructure
+        - Documentation
+        - Testing
+        - Research
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component Area
+      description: Which component does this affect?
+      options:
+        - Database Schema
+        - Kubernetes Manifests
+        - Shell Scripts
+        - Docker Configuration
+        - Documentation
+        - CI/CD
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How urgent is this task?
+      options:
+        - Critical
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How will we know this task is complete?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Criterion 3
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing Requirements
+      description: What testing is needed?
+      placeholder: Describe testing requirements...
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Implementation Notes
+      description: Any technical notes or considerations
+      placeholder: Add implementation notes...
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related Issues/PRs
+      description: Link to related issues or pull requests
+      placeholder: |
+        - #123
+        - #456

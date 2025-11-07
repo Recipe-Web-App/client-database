@@ -1,0 +1,64 @@
+# Dependencies
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: [go.mod, go.sum, package.json, requirements.txt, .github/dependabot.yml]
+
+# Documentation
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.md", "docs/**/*"]
+
+# GitHub
+github:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**/*"]
+
+# GitHub Actions
+github-actions:
+  - changed-files:
+      - any-glob-to-any-file: [".github/workflows/**/*"]
+
+# Docker
+docker:
+  - changed-files:
+      - any-glob-to-any-file: [Dockerfile, "docker-compose*.yml", .dockerignore]
+
+# Configuration
+configuration:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.yml", "**/*.yaml", "**/*.json", ".env*"]
+
+# Database Schema
+database-schema:
+  - changed-files:
+      - any-glob-to-any-file: ["db/init/schema/**/*"]
+
+# Database Fixtures
+database-fixtures:
+  - changed-files:
+      - any-glob-to-any-file: ["db/fixtures/**/*"]
+
+# Database Users
+database-users:
+  - changed-files:
+      - any-glob-to-any-file: ["db/init/users/**/*"]
+
+# SQL
+sql:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.sql"]
+
+# Kubernetes
+kubernetes:
+  - changed-files:
+      - any-glob-to-any-file: ["k8s/**/*"]
+
+# Scripts
+scripts:
+  - changed-files:
+      - any-glob-to-any-file: ["scripts/**/*", "**/*.sh"]
+
+# Makefile
+makefile:
+  - changed-files:
+      - any-glob-to-any-file: [Makefile, "**/*.mk"]

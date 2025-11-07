@@ -1,0 +1,14 @@
+# Global ownership
+* @jsamuelsen11
+
+# Documentation
+/docs/ @jsamuelsen11
+
+# Database schema
+/db/init/schema/ @jsamuelsen11
+
+# Kubernetes manifests
+/k8s/ @jsamuelsen11
+
+# GitHub workflows
+/.github/workflows/ @jsamuelsen11
