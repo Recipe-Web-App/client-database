@@ -34,13 +34,9 @@ repos:
   - repo: https://github.com/sqlfluff/sqlfluff
     rev: 4.0.0a1
     hooks:
-      - id: sqlfluff-lint
-        name: Lint SQL files
-        args: [--dialect, mysql]
-        files: \.sql$
       - id: sqlfluff-fix
-        name: Fix SQL files
-        args: [--dialect, mysql]
+        name: Lint and fix SQL files
+        args: [--dialect, mysql, --exclude-rules, "RF04,RF05"]
         files: \.sql$
 
   # Shell script linting

@@ -5,17 +5,10 @@
 .env.local
 .env.*.local
 
-# Database files (never commit actual database files)
-*.db
-*.sqlite
-*.sqlite3
-*.sql
-*.sql.gz
-*.dump
-
 # Backup files (stored locally, not in version control)
 db/data/backups/*
 !db/data/backups/.gitkeep
+*.sql.gz
 
 # Export files
 db/data/exports/*

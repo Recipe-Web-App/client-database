@@ -2,155 +2,21 @@
 # See https://docs.sqlfluff.com/en/stable/configuration.html
 
 [sqlfluff]
-# MySQL 8.0 dialect
 dialect = mysql
-
-# Templater (raw for standard SQL files)
 templater = raw
-
-# Line length
 max_line_length = 120
-
-# Indentation
 indent_unit = space
-tab_space_size = 2
-
-# Exclude patterns
-exclude_rules = None
-
-# SQL file encoding
 encoding = utf-8
-
-# Processes (0 = auto-detect CPU count)
-processes = 0
-
-# Disable progress bar (pre-commit handles this)
 disable_progress_bar = True
 
 [sqlfluff:indentation]
-# Indentation settings
-indented_joins = False
-indented_ctes = False
-indented_using_on = True
-template_blocks_indent = True
-
-[sqlfluff:rules]
-# Indentation
-L003.tab_space_size = 2
-L003.indent_unit = space
-
-# Trailing whitespace
-L001.ignore_trailing_semicolons = False
-
-# Mixed tabs and spaces
-L002.tab_space_size = 2
-
-# Keywords capitalization
-L010.capitalisation_policy = upper
-
-# Aliasing
-L011.aliasing = explicit
-
-# Implicit/explicit aliasing of table
-L012.aliasing = explicit
-
-# Implicit/explicit aliasing of columns
-L013.aliasing = explicit
-
-# Unquoted identifiers (L014)
-L014.capitalisation_policy = lower
-L014.extended_capitalisation_policy = lower
-
-# Trailing commas
-L019.comma_style = trailing
-
-# Table aliases
-L027.aliasing = explicit
-
-# References
-L028.single_table_references = consistent
-
-# Keywords as identifiers
-L029.unquoted_identifiers_policy = all
-L029.quoted_identifiers_policy = all
-
-# Function names capitalization
-L030.capitalisation_policy = upper
-
-# 'USING' clause
-L032.wildcard_policy = single
-
-# Comma separated list hanging indents
-L034.select_clause_trailing_comma = forbid
-
-# Ambiguous use of DISTINCT
-L041.select_clause_trailing_comma = forbid
-
-# Redundant qualifying in JOIN
-L044.prefer_count_1 = False
-L044.prefer_count_0 = False
-
-# Subquery usage
-L045.forbid_subquery_in = both
-
-# Unnecessary quoted identifier
-L059.prefer_quoted_identifiers = False
-L059.ignore_words = None
-L059.force_quoted_identifiers = False
-
-# Line length
-L016.max_line_length = 120
-L016.tab_space_size = 2
-L016.indent_unit = space
-
-[sqlfluff:rules:L003]
-# Indentation
 tab_space_size = 2
-indent_unit = space
-hanging_indents = True
 
-[sqlfluff:rules:L010]
-# Keywords should be UPPERCASE
+[sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = upper
 
-[sqlfluff:rules:L014]
-# Unquoted identifiers should be lowercase
+[sqlfluff:rules:capitalisation.identifiers]
 capitalisation_policy = lower
-extended_capitalisation_policy = lower
 
-[sqlfluff:rules:L016]
-# Line length
-max_line_length = 120
-tab_space_size = 2
-ignore_comment_lines = True
-ignore_comment_clauses = True
-
-[sqlfluff:rules:L030]
-# Function names should be UPPERCASE
+[sqlfluff:rules:capitalisation.functions]
 capitalisation_policy = upper
-
-[sqlfluff:rules:L040]
-# Null comparison should use IS/IS NOT
-null_eq_allowed = False
-
-[sqlfluff:rules:L042]
-# Join/FROM clauses should not contain subqueries (use CTEs instead)
-# Disabled for flexibility
-forbid_subquery_in = none
-
-[sqlfluff:rules:L051]
-# UNION/INTERSECT/EXCEPT should use DISTINCT or ALL explicitly
-fully_qualify_join_types = inner
-
-[sqlfluff:rules:L052]
-# Semi-colons should be consistent
-require_final_semicolon = True
-multiline_newline = True
-
-[sqlfluff:rules:L054]
-# GROUP BY/ORDER BY should reference columns, not use numbers
-group_by_and_order_by_style = consistent
-
-[sqlfluff:rules:L059]
-# Unnecessary quoted identifier
-prefer_quoted_identifiers = False
