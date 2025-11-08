@@ -1,0 +1,125 @@
+# StatefulSet for MySQL 8.0 database
+# Provides persistent storage for OAuth2 client credentials
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: client-database-mysql
+  namespace: client-database
+  labels:
+    app: client-database
+    component: mysql
+spec:
+  serviceName: client-database
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client-database
+      component: mysql
+  template:
+    metadata:
+      labels:
+        app: client-database
+        component: mysql
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+
+      containers:
+        - name: mysql
+          image: client-database-mysql:latest
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          ports:
+            - containerPort: 3306
+              name: mysql
+              protocol: TCP
+
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: client-database-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: client-database-secrets
+                  key: MYSQL_DATABASE
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+              ephemeral-storage: 2Gi
+
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+            - name: mysql-config
+              mountPath: /etc/mysql/conf.d
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /var/run/mysqld
+
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+          readinessProbe:
+            exec:
+              command:
+                - mysql
+                - -h
+                - 127.0.0.1
+                - -e
+                - SELECT 1
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            timeoutSeconds: 1
+
+      volumes:
+        - name: mysql-config
+          configMap:
+            name: client-database-config
+            items:
+              - key: my.cnf
+                path: my.cnf
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+        labels:
+          app: client-database
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi

@@ -1,0 +1,114 @@
+# Kubernetes Job for Database Restore
+# Restores MySQL backup from repository's db/data/backups/ directory
+# Note: Job name, hostPath volume, and BACKUP_FILE env var are set by deployment script
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: client-database-restore
+  namespace: client-database
+  labels:
+    app: client-database
+    component: restore
+spec:
+  ttlSecondsAfterFinished: 7200 # Keep for 2 hours for auditing
+  backoffLimit: 1 # Only 1 retry for restore operations
+  template:
+    metadata:
+      labels:
+        app: client-database
+        component: restore
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+
+      securityContext:
+        fsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+
+      containers:
+        - name: mysql-restore
+          image: client-database-jobs:latest
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+              ephemeral-storage: 1Gi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: 2Gi
+
+          command: ["/bin/bash"]
+          args: ["/app/scripts/jobHelpers/db-restore.sh"]
+
+          env:
+            # Connection info from ConfigMap
+            - name: MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: client-database-config
+                  key: MYSQL_HOST
+            - name: MYSQL_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: client-database-config
+                  key: MYSQL_PORT
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: client-database-config
+                  key: MYSQL_DATABASE
+            # Credentials from Secret (use root for restore)
+            - name: MYSQL_USER
+              value: root
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: client-database-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            # Restore-specific config
+            # Note: BACKUP_FILE and RESTORE_CONFIRMED will be set by deployment script
+            - name: BACKUP_FILE
+              value: backup-file-name.sql.gz
+            - name: RESTORE_CONFIRMED
+              value: "false"
+
+          volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+              readOnly: true # Read-only for safety
+            - name: mysql-config
+              mountPath: /etc/mysql/conf.d
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        # hostPath volume for backups (read-only)
+        # Note: Path will be set by deployment script to repository's db/data/backups/
+        - name: backup-storage
+          hostPath:
+            path: /path/to/repo/db/data/backups
+            type: Directory
+        # MySQL configuration from ConfigMap
+        - name: mysql-config
+          configMap:
+            name: client-database-config
+            items:
+              - key: my.cnf
+                path: my.cnf
+        # Temporary storage
+        - name: tmp
+          emptyDir: {}

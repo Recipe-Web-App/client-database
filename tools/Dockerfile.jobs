@@ -13,15 +13,16 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Install dependencies and tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        # Bash shell for scripts
+        bash=5.1-* \
+        # CA certificates for TLS connections
+        ca-certificates=* \
+        # Download tools for golang-migrate
+        curl=7.81.0-* \
         # Template substitution for Kubernetes manifests
         gettext-base=0.21-* \
         # Compression for backup files
-        gzip=1.10-* \
-        # Bash shell for scripts
-        bash=5.1-* \
-        # Download tools for golang-migrate
-        curl=7.81.0-* \
-        ca-certificates=* && \
+        gzip=1.10-* && \
     # Clean up apt cache to reduce layer size
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -50,16 +51,16 @@ ENV LANG=C.UTF-8 \
 # Install only runtime dependencies (no build tools)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        # Shell interpreter
+        bash=5.2.15-* \
+        # CA certificates for TLS connections
+        ca-certificates=* \
         # MySQL client for database operations
         default-mysql-client=1.1.0-* \
         # Template substitution
         gettext-base=0.21-* \
         # Compression/decompression
-        gzip=1.12-* \
-        # Shell interpreter
-        bash=5.2.15-* \
-        # CA certificates for TLS connections
-        ca-certificates=* && \
+        gzip=1.12-* && \
     # Clean up
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -69,11 +70,10 @@ COPY --from=builder /usr/local/bin/migrate /usr/local/bin/migrate
 
 # Create non-root user and group for security
 # UID/GID 10001 matches Kubernetes securityContext
-RUN groupadd -g 10001 jobuser && \
-    useradd -u 10001 -g jobuser -m -s /bin/bash jobuser
-
 # Create application directory structure
-RUN mkdir -p /app/sql/init/schema \
+RUN groupadd -g 10001 jobuser && \
+    useradd -u 10001 -g jobuser -m -s /bin/bash jobuser && \
+    mkdir -p /app/sql/init/schema \
              /app/sql/init/users \
              /app/sql/fixtures \
              /app/scripts/jobHelpers \
@@ -100,7 +100,7 @@ USER jobuser
 
 # Default environment variables (non-sensitive)
 # Sensitive values should come from Kubernetes Secrets
-ENV MYSQL_HOST=mysql-service \
+ENV MYSQL_HOST=client-database \
     MYSQL_PORT=3306 \
     MYSQL_DATABASE=client_db
 

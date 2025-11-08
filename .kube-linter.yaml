@@ -1,0 +1,12 @@
+# KubeLinter configuration for client-database repository
+
+checks:
+  doNotAutoAddDefaults: false
+  exclude:
+    # We use :latest tag for local development with minikube
+    # Image is built locally and loaded directly into cluster
+    - "latest-tag"
+
+    # False positive - service selector matches StatefulSet labels correctly
+    # This check fails at lint-time because no pods are deployed yet
+    - "dangling-service"

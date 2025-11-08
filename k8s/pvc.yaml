@@ -1,0 +1,19 @@
+# PersistentVolumeClaim for MySQL database storage
+# StatefulSet will automatically create PVC with this pattern: {volumeClaimTemplate.name}-{statefulset.name}-{ordinal}
+# Example: mysql-data-client-database-mysql-0
+# For reference only - StatefulSet uses volumeClaimTemplates
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data-client-database-mysql-0
+  namespace: client-database
+  labels:
+    app: client-database
+    component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

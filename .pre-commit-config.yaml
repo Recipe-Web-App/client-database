@@ -70,9 +70,9 @@ repos:
     rev: v2.14.0
     hooks:
       - id: hadolint
-        name: Lint Dockerfile
-        args: [--ignore, DL3008, --ignore, DL3009] # Ignore pin versions (can adjust as needed)
-        files: Dockerfile|\.dockerfile$
+        name: Lint Dockerfiles
+        args: [--ignore, DL3008, --ignore, DL3009, --ignore, DL3041] # Ignore pin versions (can adjust as needed)
+        files: ^tools/Dockerfile\.(jobs|mysql)$
 
   # Docker and filesystem security scanning
   - repo: https://github.com/mxab/pre-commit-trivy

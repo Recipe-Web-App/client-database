@@ -8,19 +8,20 @@ This is a **MySQL 8.0 database infrastructure repository** for storing OAuth2 cl
 
 ### Current Implementation Status
 
-**IMPORTANT**: This repository is currently in a **planning/documentation phase** (deployment-impl branch). Comprehensive documentation exists in `docs/`, and database schema is complete in `db/init/`, but the following directories are documented but **not yet created**:
+**IMPORTANT**: This repository is currently in a **planning/documentation phase** (deployment-impl branch). Comprehensive documentation exists in `docs/`, database schema is complete in `db/init/`, and infrastructure configuration is in place:
 
-- `k8s/` - Kubernetes manifests (StatefulSet, Service, Jobs, PVCs)
-- `scripts/` - Operational bash scripts (containerManagement/, dbManagement/, jobHelpers/)
-- `migrations/` - golang-migrate migration files
-- `tools/` - Dockerfile for custom job images
+- `k8s/` - **COMPLETE** - Kubernetes manifests (StatefulSet, Service, Jobs, PVCs)
+- `tools/` - **COMPLETE** - Custom Docker images (MySQL server + Jobs)
+- `scripts/` - **NOT YET CREATED** - Operational bash scripts (containerManagement/, dbManagement/, jobHelpers/)
+- `migrations/` - **NOT YET CREATED** - golang-migrate migration files
 
-When implementing these, follow the patterns documented in `docs/REPOSITORY_STRUCTURE.md` and `docs/DEPLOYMENT_PLAN.md`.
+When implementing remaining directories, follow the patterns documented in `docs/REPOSITORY_STRUCTURE.md` and `docs/DEPLOYMENT_PLAN.md`.
 
 ## Technology Stack
 
 - **Database**: MySQL 8.0 with InnoDB storage engine
 - **Platform**: Kubernetes 1.20+ (no application code - pure infrastructure)
+- **Container Images**: Custom Docker images for MySQL server and Jobs
 - **Configuration**: envsubst for template-based Kubernetes manifests
 - **Migrations**: golang-migrate
 - **Backup/Restore**: mysqldump with Kubernetes Jobs
@@ -29,7 +30,31 @@ When implementing these, follow the patterns documented in `docs/REPOSITORY_STRU
 
 ## Key Architectural Patterns
 
-### 1. Kubernetes-Native Deployment
+### 1. Custom Docker Images
+
+We use **two custom-built Docker images** for complete control over the MySQL environment:
+
+**MySQL Server Image** (`client-database-mysql:latest`):
+- Base: Official `mysql:8.0` (Oracle Linux)
+- Adds: Production debugging tools (curl, wget, netcat, htop, vim, etc.)
+- Used by: StatefulSet (`k8s/statefulset.yaml`)
+- Dockerfile: `tools/Dockerfile.mysql`
+- Build: `make docker-build-mysql`
+
+**Jobs Image** (`client-database-jobs:latest`):
+- Base: Debian Bookworm Slim
+- Includes: MySQL client, mysqldump, golang-migrate, envsubst, bash
+- Used by: All Kubernetes Jobs (`k8s/jobs/*.yaml`)
+- Dockerfile: `tools/Dockerfile.jobs`
+- Build: `make docker-build-jobs`
+
+**Why custom images?**
+- Version control: Pin exact MySQL version and tool versions
+- Production readiness: Include debugging and monitoring utilities
+- Consistency: Same images across dev, staging, and production
+- Security: Control base images and apply patches independently
+
+### 2. Kubernetes-Native Deployment
 
 All operations are Kubernetes-native:
 
@@ -38,7 +63,7 @@ All operations are Kubernetes-native:
 - **PersistentVolumeClaim** for database storage (10Gi)
 - **Jobs** for operational tasks (backup, restore, schema loading, migrations)
 
-### 2. hostPath Backup Strategy (Non-Standard Pattern)
+### 3. hostPath Backup Strategy (Non-Standard Pattern)
 
 Unlike typical Kubernetes patterns, backups are stored **directly in the repository** at `db/data/backups/`:
 
@@ -49,7 +74,7 @@ Unlike typical Kubernetes patterns, backups are stored **directly in the reposit
 
 This is configured dynamically with the repository's absolute path when deploying Jobs.
 
-### 3. Template-Based Configuration
+### 4. Template-Based Configuration
 
 No hardcoded secrets or environment-specific values:
 
@@ -57,7 +82,7 @@ No hardcoded secrets or environment-specific values:
 - All configuration via `.env` files
 - Secrets stored in Kubernetes Secrets, never in code
 
-### 4. Read-Optimized Single-Table Design
+### 5. Read-Optimized Single-Table Design
 
 Database: `client_db`
 Table: `oauth2_clients`
@@ -81,7 +106,7 @@ Table: `oauth2_clients`
 - Audit fields: `created_at`, `updated_at`, `created_by`
 - `metadata` (JSON, nullable) - Extensible metadata
 
-### 5. Job-Based Operations
+### 6. Job-Based Operations
 
 Operational tasks run as Kubernetes Jobs, not directly on the pod:
 
@@ -150,7 +175,7 @@ The auth-service connects via standard MySQL protocol over TCP:
 
 **Connection details**:
 
-- Host: `mysql-service` (within Kubernetes cluster)
+- Host: `client-database` (within Kubernetes cluster)
 - Port: `3306`
 - Database: `client_db`
 - User: `client_db_user` (has SELECT, INSERT, UPDATE permissions)
@@ -161,7 +186,7 @@ The auth-service connects via standard MySQL protocol over TCP:
 dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
     os.Getenv("MYSQL_USER"),        // client_db_user
     os.Getenv("MYSQL_PASSWORD"),    // from Kubernetes Secret
-    os.Getenv("MYSQL_HOST"),        // mysql-service
+    os.Getenv("MYSQL_HOST"),        // client-database
     os.Getenv("MYSQL_PORT"),        // 3306
     os.Getenv("MYSQL_DATABASE"),    // client_db
 )

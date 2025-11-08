@@ -200,7 +200,7 @@ kind: StatefulSet
 metadata:
   name: mysql
 spec:
-  serviceName: mysql-service
+  serviceName: client-database
   replicas: 1
   selector:
     matchLabels:
@@ -219,17 +219,17 @@ spec:
         - name: MYSQL_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: mysql-secrets
+              name: client-database-secrets
               key: MYSQL_ROOT_PASSWORD
         volumeMounts:
         - name: mysql-data
           mountPath: /var/lib/mysql
-        - name: mysql-config
+        - name: client-database-config
           mountPath: /etc/mysql/conf.d
       volumes:
-      - name: mysql-config
+      - name: client-database-config
         configMap:
-          name: mysql-config
+          name: client-database-config
   volumeClaimTemplates:
   - metadata:
       name: mysql-data
@@ -240,13 +240,13 @@ spec:
           storage: 10Gi
 ```
 
-#### Service: mysql-service
+#### Service: client-database
 
 ```yaml
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql-service
+  name: client-database
 spec:
   selector:
     app: client-database
@@ -257,13 +257,13 @@ spec:
   clusterIP: None  # Headless service for StatefulSet
 ```
 
-#### ConfigMap: mysql-config
+#### ConfigMap: client-database-config
 
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: mysql-config
+  name: client-database-config
 data:
   my.cnf: |
     [mysqld]
@@ -275,13 +275,13 @@ data:
     long_query_time=2
 ```
 
-#### Secret: mysql-secrets
+#### Secret: client-database-secrets
 
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: mysql-secrets
+  name: client-database-secrets
 type: Opaque
 stringData:
   MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -297,7 +297,7 @@ stringData:
 **Connection Details:**
 
 - **Protocol**: MySQL protocol over TCP
-- **Host**: `mysql-service.default.svc.cluster.local` (or just `mysql-service` in same namespace)
+- **Host**: `client-database.default.svc.cluster.local` (or just `client-database` in same namespace)
 - **Port**: 3306
 - **Credentials**: From environment variables or Kubernetes Secret
 - **Connection pooling**: Configured in auth-service application
@@ -392,7 +392,7 @@ db.SetConnMaxLifetime(5 * time.Minute)
 4. Job pod mounts:
    - MySQL Service connection (network access to database)
    - hostPath volume: `$PROJECT_ROOT/db/data/backups` → `/backups` in container
-5. Job executes: `mysqldump -h mysql-service -uroot -p$MYSQL_ROOT_PASSWORD --single-transaction client_db | gzip > /backups/clients-$(date).sql.gz`
+5. Job executes: `mysqldump -h client-database -uroot -p$MYSQL_ROOT_PASSWORD --single-transaction client_db | gzip > /backups/clients-$(date).sql.gz`
 6. Job completes, backup stored in repository's `db/data/backups/`
 
 **Backup Storage:**
@@ -424,7 +424,7 @@ db.SetConnMaxLifetime(5 * time.Minute)
    - Repository path for hostPath mount
 5. Job pod mounts:
    - hostPath volume: `$PROJECT_ROOT/db/data/backups` → `/backups` in container (read-only)
-6. Job executes: `gunzip < /backups/<file> | mysql -h mysql-service -uroot -p$MYSQL_ROOT_PASSWORD client_db`
+6. Job executes: `gunzip < /backups/<file> | mysql -h client-database -uroot -p$MYSQL_ROOT_PASSWORD client_db`
 7. Job completes
 8. Script scales MySQL StatefulSet to 1 (restart)
 9. Script verifies database health

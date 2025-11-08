@@ -156,98 +156,145 @@ scan-security:  ## Scan for security vulnerabilities
 # ============================================================================
 
 # Docker image configuration
-DOCKER_IMAGE ?= client-database-jobs
+JOBS_IMAGE ?= client-database-jobs
+MYSQL_IMAGE ?= client-database-mysql
 DOCKER_TAG ?= latest
 DOCKER_REGISTRY ?=
-FULL_IMAGE_NAME = $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY)/,)$(DOCKER_IMAGE):$(DOCKER_TAG)
+JOBS_FULL_NAME = $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY)/,)$(JOBS_IMAGE):$(DOCKER_TAG)
+MYSQL_FULL_NAME = $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY)/,)$(MYSQL_IMAGE):$(DOCKER_TAG)
+
+.PHONY: docker-build-jobs
+docker-build-jobs:  ## Build Docker image for Kubernetes Jobs
+	@echo "Building Jobs image: $(JOBS_FULL_NAME)"
+	docker build -f tools/Dockerfile.jobs --build-arg BUILDKIT_INLINE_CACHE=1 -t $(JOBS_FULL_NAME) .
+	@echo "✓ Jobs image built successfully: $(JOBS_FULL_NAME)"
+
+.PHONY: docker-build-mysql
+docker-build-mysql:  ## Build Docker image for MySQL StatefulSet
+	@echo "Building MySQL image: $(MYSQL_FULL_NAME)"
+	docker build -f tools/Dockerfile.mysql --build-arg BUILDKIT_INLINE_CACHE=1 -t $(MYSQL_FULL_NAME) .
+	@echo "✓ MySQL image built successfully: $(MYSQL_FULL_NAME)"
 
 .PHONY: docker-build
-docker-build:  ## Build Docker image for Kubernetes Jobs
-	@echo "Building Docker image: $(FULL_IMAGE_NAME)"
-	docker build -f tools/Dockerfile -t $(FULL_IMAGE_NAME) .
-	@echo "✓ Image built successfully: $(FULL_IMAGE_NAME)"
+docker-build: docker-build-jobs docker-build-mysql  ## Build both Docker images (Jobs + MySQL)
+	@echo "✓ All images built successfully"
 
 .PHONY: docker-build-nc
-docker-build-nc:  ## Build Docker image without cache (clean build)
-	@echo "Building Docker image (no cache): $(FULL_IMAGE_NAME)"
-	docker build --no-cache -f tools/Dockerfile -t $(FULL_IMAGE_NAME) .
-	@echo "✓ Image built successfully: $(FULL_IMAGE_NAME)"
+docker-build-nc:  ## Build both Docker images without cache (clean build)
+	@echo "Building Jobs image (no cache): $(JOBS_FULL_NAME)"
+	docker build --no-cache -f tools/Dockerfile.jobs -t $(JOBS_FULL_NAME) .
+	@echo "Building MySQL image (no cache): $(MYSQL_FULL_NAME)"
+	docker build --no-cache -f tools/Dockerfile.mysql -t $(MYSQL_FULL_NAME) .
+	@echo "✓ All images built successfully"
 
 .PHONY: docker-tag
-docker-tag:  ## Tag Docker image (usage: make docker-tag DOCKER_TAG=v1.0.0)
+docker-tag:  ## Tag both Docker images (usage: make docker-tag DOCKER_TAG=v1.0.0)
 	@test -n "$(DOCKER_TAG)" || (echo "Error: DOCKER_TAG not specified. Usage: make docker-tag DOCKER_TAG=v1.0.0" && exit 1)
-	docker tag $(DOCKER_IMAGE):latest $(FULL_IMAGE_NAME)
-	@echo "✓ Image tagged: $(FULL_IMAGE_NAME)"
+	docker tag $(JOBS_IMAGE):latest $(JOBS_FULL_NAME)
+	docker tag $(MYSQL_IMAGE):latest $(MYSQL_FULL_NAME)
+	@echo "✓ Images tagged: $(JOBS_FULL_NAME), $(MYSQL_FULL_NAME)"
 
 .PHONY: docker-push
-docker-push:  ## Push Docker image to registry (usage: make docker-push DOCKER_REGISTRY=your-registry.io)
+docker-push:  ## Push both Docker images to registry (usage: make docker-push DOCKER_REGISTRY=your-registry.io)
 	@test -n "$(DOCKER_REGISTRY)" || (echo "Error: DOCKER_REGISTRY not specified. Usage: make docker-push DOCKER_REGISTRY=your-registry.io" && exit 1)
-	docker push $(FULL_IMAGE_NAME)
-	@echo "✓ Image pushed: $(FULL_IMAGE_NAME)"
+	docker push $(JOBS_FULL_NAME)
+	docker push $(MYSQL_FULL_NAME)
+	@echo "✓ Images pushed: $(JOBS_FULL_NAME), $(MYSQL_FULL_NAME)"
 
 .PHONY: docker-pull
-docker-pull:  ## Pull Docker image from registry
+docker-pull:  ## Pull both Docker images from registry
 	@test -n "$(DOCKER_REGISTRY)" || (echo "Error: DOCKER_REGISTRY not specified. Usage: make docker-pull DOCKER_REGISTRY=your-registry.io" && exit 1)
-	docker pull $(FULL_IMAGE_NAME)
-	@echo "✓ Image pulled: $(FULL_IMAGE_NAME)"
+	docker pull $(JOBS_FULL_NAME)
+	docker pull $(MYSQL_FULL_NAME)
+	@echo "✓ Images pulled: $(JOBS_FULL_NAME), $(MYSQL_FULL_NAME)"
 
 .PHONY: docker-lint
-docker-lint:  ## Lint Dockerfile with hadolint
-	@echo "Linting Dockerfile..."
+docker-lint:  ## Lint both Dockerfiles with hadolint
+	@echo "Linting Dockerfiles..."
 	@command -v hadolint >/dev/null 2>&1 || { echo "Error: hadolint not installed. Install with: brew install hadolint (macOS) or see https://github.com/hadolint/hadolint"; exit 1; }
-	hadolint tools/Dockerfile
-	@echo "✓ Dockerfile lint passed"
+	hadolint tools/Dockerfile.jobs
+	hadolint tools/Dockerfile.mysql
+	@echo "✓ All Dockerfiles passed lint"
 
 .PHONY: docker-scan
-docker-scan:  ## Security scan Docker image with trivy
-	@echo "Scanning image for vulnerabilities: $(FULL_IMAGE_NAME)"
+docker-scan:  ## Security scan both Docker images with trivy
+	@echo "Scanning Jobs image: $(JOBS_FULL_NAME)"
 	@command -v trivy >/dev/null 2>&1 || { echo "Error: trivy not installed. Install with: brew install trivy (macOS) or see https://github.com/aquasecurity/trivy"; exit 1; }
-	trivy image --severity HIGH,CRITICAL $(FULL_IMAGE_NAME)
-	@echo "✓ Security scan complete"
+	trivy image --severity HIGH,CRITICAL $(JOBS_FULL_NAME)
+	@echo "Scanning MySQL image: $(MYSQL_FULL_NAME)"
+	trivy image --severity HIGH,CRITICAL $(MYSQL_FULL_NAME)
+	@echo "✓ Security scans complete"
 
 .PHONY: docker-scan-full
-docker-scan-full:  ## Full security scan (all severities)
-	@echo "Running full security scan: $(FULL_IMAGE_NAME)"
+docker-scan-full:  ## Full security scan (all severities) for both images
+	@echo "Running full security scan on Jobs image: $(JOBS_FULL_NAME)"
 	@command -v trivy >/dev/null 2>&1 || { echo "Error: trivy not installed"; exit 1; }
-	trivy image $(FULL_IMAGE_NAME)
+	trivy image $(JOBS_FULL_NAME)
+	@echo "Running full security scan on MySQL image: $(MYSQL_FULL_NAME)"
+	trivy image $(MYSQL_FULL_NAME)
 
 .PHONY: docker-inspect
-docker-inspect:  ## Inspect Docker image details
-	@echo "Image: $(FULL_IMAGE_NAME)"
-	@echo "---"
-	docker inspect $(FULL_IMAGE_NAME) | grep -A 10 "Config"
-	@echo "---"
-	@echo "Image size:"
-	docker images $(DOCKER_IMAGE) --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+docker-inspect:  ## Inspect both Docker images
+	@echo "=== Jobs Image: $(JOBS_FULL_NAME) ==="
+	docker inspect $(JOBS_FULL_NAME) | grep -A 10 "Config"
+	@echo ""
+	@echo "=== MySQL Image: $(MYSQL_FULL_NAME) ==="
+	docker inspect $(MYSQL_FULL_NAME) | grep -A 10 "Config"
+	@echo ""
+	@echo "=== Image Sizes ==="
+	docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | grep -E "REPOSITORY|client-database"
+
+.PHONY: docker-test-jobs
+docker-test-jobs:  ## Test Jobs Docker image
+	@echo "Testing Jobs image: $(JOBS_FULL_NAME)"
+	@echo "1. Testing mysql client..."
+	docker run --rm $(JOBS_FULL_NAME) mysql --version
+	@echo "2. Testing envsubst..."
+	docker run --rm $(JOBS_FULL_NAME) envsubst --version
+	@echo "3. Testing golang-migrate..."
+	docker run --rm $(JOBS_FULL_NAME) migrate -version
+	@echo "4. Testing bash..."
+	docker run --rm $(JOBS_FULL_NAME) bash --version
+	@echo "5. Verifying SQL files..."
+	docker run --rm $(JOBS_FULL_NAME) ls -la /app/sql/init/schema/
+	@echo "✓ Jobs image tests passed"
+
+.PHONY: docker-test-mysql
+docker-test-mysql:  ## Test MySQL Docker image
+	@echo "Testing MySQL image: $(MYSQL_FULL_NAME)"
+	@echo "1. Testing mysql client..."
+	docker run --rm $(MYSQL_FULL_NAME) mysql --version
+	@echo "2. Testing mysqladmin..."
+	docker run --rm $(MYSQL_FULL_NAME) mysqladmin --version
+	@echo "3. Testing curl..."
+	docker run --rm $(MYSQL_FULL_NAME) curl --version
+	@echo "4. Testing network tools..."
+	docker run --rm $(MYSQL_FULL_NAME) which netcat
+	@echo "✓ MySQL image tests passed"
 
 .PHONY: docker-test
-docker-test:  ## Test Docker image locally (run basic commands)
-	@echo "Testing Docker image: $(FULL_IMAGE_NAME)"
-	@echo "1. Testing mysql client..."
-	docker run --rm $(FULL_IMAGE_NAME) mysql --version
-	@echo "2. Testing envsubst..."
-	docker run --rm $(FULL_IMAGE_NAME) envsubst --version
-	@echo "3. Testing golang-migrate..."
-	docker run --rm $(FULL_IMAGE_NAME) migrate -version
-	@echo "4. Testing bash..."
-	docker run --rm $(FULL_IMAGE_NAME) bash --version
-	@echo "5. Verifying SQL files..."
-	docker run --rm $(FULL_IMAGE_NAME) ls -la /app/sql/init/schema/
-	@echo "✓ All tests passed"
+docker-test: docker-test-jobs docker-test-mysql  ## Test both Docker images
+	@echo "✓ All image tests passed"
 
-.PHONY: docker-shell
-docker-shell:  ## Open interactive shell in Docker image
-	docker run --rm -it $(FULL_IMAGE_NAME) /bin/bash
+.PHONY: docker-shell-jobs
+docker-shell-jobs:  ## Open interactive shell in Jobs image
+	docker run --rm -it $(JOBS_FULL_NAME) /bin/bash
+
+.PHONY: docker-shell-mysql
+docker-shell-mysql:  ## Open interactive shell in MySQL image
+	docker run --rm -it $(MYSQL_FULL_NAME) /bin/bash
 
 .PHONY: docker-clean
-docker-clean:  ## Remove Docker image locally
-	docker rmi $(FULL_IMAGE_NAME) || true
-	@echo "✓ Image removed: $(FULL_IMAGE_NAME)"
+docker-clean:  ## Remove both Docker images locally
+	docker rmi $(JOBS_FULL_NAME) || true
+	docker rmi $(MYSQL_FULL_NAME) || true
+	@echo "✓ Images removed"
 
 .PHONY: docker-clean-all
-docker-clean-all:  ## Remove all versions of the Docker image
-	docker images $(DOCKER_IMAGE) -q | xargs -r docker rmi || true
-	@echo "✓ All $(DOCKER_IMAGE) images removed"
+docker-clean-all:  ## Remove all versions of both Docker images
+	docker images $(JOBS_IMAGE) -q | xargs -r docker rmi || true
+	docker images $(MYSQL_IMAGE) -q | xargs -r docker rmi || true
+	@echo "✓ All client-database images removed"
 
 .PHONY: docker-ci
 docker-ci: docker-lint docker-build docker-scan docker-test  ## Run full Docker CI pipeline (lint, build, scan, test)
@@ -269,17 +316,17 @@ clean-backups:  ## Clean old backups (>30 days)
 
 .PHONY: logs
 logs:  ## View MySQL pod logs
-	kubectl logs -f mysql-0 -n $(NAMESPACE)
+	kubectl logs -f client-database-mysql-0 -n $(NAMESPACE)
 
 .PHONY: shell
 shell:  ## Open shell in MySQL pod
-	kubectl exec -it mysql-0 -n $(NAMESPACE) -- /bin/bash
+	kubectl exec -it client-database-mysql-0 -n $(NAMESPACE) -- /bin/bash
 
 .PHONY: port-forward
 port-forward:  ## Port forward MySQL to localhost:3306
 	@echo "Forwarding MySQL to localhost:3306..."
 	@echo "Press Ctrl+C to stop"
-	kubectl port-forward svc/mysql-service 3306:3306 -n $(NAMESPACE)
+	kubectl port-forward svc/client-database 3306:3306 -n $(NAMESPACE)
 
 # ============================================================================
 # CI/CD Commands

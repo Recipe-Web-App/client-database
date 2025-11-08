@@ -5,41 +5,70 @@ client-database Kubernetes deployment.
 
 ## Overview
 
-The client-database repository uses two distinct container images:
+The client-database repository uses **two custom container images**:
 
-1. **Official MySQL Image** (`mysql:8.0`) - Used directly for the MySQL StatefulSet
-2. **Custom Jobs Image** (`client-database-jobs`) - Used for operational Kubernetes Jobs (backup,
-   restore, migrations, schema loading)
+1. **MySQL Server Image** (`client-database-mysql`) - Custom MySQL 8.0 image for the StatefulSet
+2. **Jobs Image** (`client-database-jobs`) - Operational tasks (backup, restore, migrations, schema loading)
 
-This directory contains the configuration for building the **custom Jobs image** only.
+Both images are built from Dockerfiles in this directory, giving you complete control over the MySQL environment.
 
 ## Architecture
 
 ### Image Strategy
 
-We follow Docker best practices by:
+We use **custom images for both MySQL server and Jobs** to maintain complete control:
 
-- **Using official images where possible**: The MySQL StatefulSet uses `mysql:8.0` directly without customization
-- **Minimal custom images**: Only create custom images when necessary (Jobs require additional tools)
-- **Multi-stage builds**: Separate build and runtime stages to minimize final image size
-- **Security-first**: Non-root user, minimal base, no unnecessary tools
+- **Version control**: Pin exact MySQL version and tools
+- **Production tools**: Include debugging and monitoring utilities
+- **Multi-stage builds**: Minimize final image size
+- **Security-first**: Non-root users, minimal attack surface
+- **Consistency**: Same images across dev, staging, and production
 
-### Jobs Image Purpose
+### MySQL Server Image (`client-database-mysql`)
 
-The `client-database-jobs` image is a lightweight container that includes:
+Production-ready MySQL 8.0 image that extends the official `mysql:8.0` with:
 
-- **MySQL client tools** (`mysql`, `mysqldump`) - For database operations
-- **golang-migrate** - For schema migrations
-- **envsubst** - For template substitution in Kubernetes manifests
-- **Bash** - For running operational scripts
-- **SQL initialization files** - Schema, users, fixtures
-- **Job helper scripts** - Backup, restore, migration, schema loading logic
+- **Network utilities**: `curl`, `wget`, `nmap-ncat`, `bind-utils`, `iputils`, `telnet`
+- **Process monitoring**: `procps-ng`, `htop`
+- **System utilities**: `vim-minimal`, `less`
+- **Compression tools**: `gzip`, `bzip2`
+- **Base**: Oracle Linux (official MySQL 8.0 base)
+- **User**: UID 999 (mysql user)
+- **Size**: ~700-800MB
 
-This image is used by Kubernetes Jobs for operational tasks that require more than just the MySQL server.
+Used by: `k8s/statefulset.yaml`
+
+### Jobs Image (`client-database-jobs`)
+
+Lightweight container for operational tasks:
+
+- **MySQL client tools**: `mysql`, `mysqldump`
+- **golang-migrate**: Schema migration tool
+- **envsubst**: Template substitution
+- **Bash**: Script execution
+- **SQL files**: Schema, users, fixtures
+- **Helper scripts**: Backup, restore, migration, schema loading
+- **Base**: Debian Bookworm Slim
+- **User**: UID 10001 (non-root)
+- **Size**: ~150-200MB
+
+Used by: `k8s/jobs/*.yaml`
 
 ## Files
 
-### `Dockerfile`
+### `Dockerfile.mysql`
+
+Production MySQL server image based on official `mysql:8.0`:
+
+- **Base**: `mysql:8.0` (Oracle Linux)
+- **Package manager**: `microdnf`
+- **Production tools**: Network debugging, process monitoring, compression
+- **Multi-stage**: Base + production stages
+- **No HEALTHCHECK**: Kubernetes handles health probes
+
+Build: `docker build -f tools/Dockerfile.mysql -t client-database-mysql:latest .`
+
+### `Dockerfile.jobs`
 
 Multi-stage Dockerfile that builds the Jobs image:
 
@@ -57,19 +86,16 @@ Multi-stage Dockerfile that builds the Jobs image:
 - User: Non-root user (UID 10001)
 - Size: ~150-200MB (vs ~600MB if using full MySQL image)
 
-### `.dockerignore`
+### `.dockerignore.mysql` and `.dockerignore.jobs`
 
-Excludes unnecessary files from the build context:
+Each Dockerfile has its own `.dockerignore` file:
 
-- Version control (`.git/`)
-- Backups and data (`db/data/backups/`, `db/data/exports/`)
-- Kubernetes manifests (`k8s/`)
-- Documentation (`docs/`, `*.md`)
-- Local machine scripts (`scripts/containerManagement/`, `scripts/dbManagement/`)
+- **`.dockerignore.mysql`**: Minimal - MySQL image doesn't need repository files
+- **`.dockerignore.jobs`**: Excludes version control, docs, k8s manifests, backups
 
-**Why this matters**: Reduces build context from ~50MB to ~5MB, speeding up builds significantly.
+**Why this matters**: Reduces build context and speeds up builds significantly.
 
-## Building the Image
+## Building the Images
 
 ### Prerequisites
 
@@ -79,24 +105,31 @@ Excludes unnecessary files from the build context:
 
 ### Quick Start
 
-Build the image:
+Build both images:
 
 ```bash
 make docker-build
 ```
 
-This builds the image with default settings:
+This builds **both images** with default settings:
 
-- **Image name**: `client-database-jobs`
-- **Tag**: `latest`
+- **MySQL image**: `client-database-mysql:latest`
+- **Jobs image**: `client-database-jobs:latest`
 - **Build context**: Repository root
+
+Build individual images:
+
+```bash
+make docker-build-mysql    # Build MySQL server image only
+make docker-build-jobs      # Build Jobs image only
+```
 
 ### Build Options
 
 #### Build without cache (clean build)
 
 ```bash
-make docker-build-nc
+make docker-build-nc    # Builds both images without cache
 ```
 
 Useful when:
@@ -117,27 +150,48 @@ make docker-build DOCKER_TAG=v1.0.0
 make docker-build DOCKER_REGISTRY=your-registry.io DOCKER_TAG=v1.0.0
 ```
 
-This builds: `your-registry.io/client-database-jobs:v1.0.0`
+This builds:
+
+- `your-registry.io/client-database-mysql:v1.0.0`
+- `your-registry.io/client-database-jobs:v1.0.0`
 
 ### Build from Dockerfile Directly
 
 If you need more control:
 
 ```bash
-# From repository root
-docker build -f tools/Dockerfile -t client-database-jobs:latest .
+# MySQL image
+docker build -f tools/Dockerfile.mysql -t client-database-mysql:latest .
 
-# With build arguments
+# Jobs image
+docker build -f tools/Dockerfile.jobs -t client-database-jobs:latest .
+
+# With build arguments (Jobs only)
 docker build \
-  -f tools/Dockerfile \
+  -f tools/Dockerfile.jobs \
   --build-arg MIGRATE_VERSION=v4.17.0 \
   -t client-database-jobs:latest \
   .
 ```
 
-## Testing the Image
+## Testing the Images
 
 ### Automated Testing
+
+Test both images:
+
+```bash
+make docker-test
+```
+
+Test individual images:
+
+```bash
+make docker-test-mysql    # Test MySQL image
+make docker-test-jobs      # Test Jobs image
+```
+
+### Manual Testing - MySQL Image
 
 Run all tests:
 
@@ -188,7 +242,7 @@ docker run --rm client-database-jobs:latest cat /app/scripts/jobHelpers/db-backu
 
 ```bash
 docker run --rm \
-  -e MYSQL_HOST=mysql-service \
+  -e MYSQL_HOST=client-database \
   -e MYSQL_PORT=3306 \
   -e MYSQL_DATABASE=client_db \
   client-database-jobs:latest \
@@ -341,7 +395,7 @@ make docker-clean-all
 
 Default non-sensitive environment variables (can be overridden):
 
-- `MYSQL_HOST=mysql-service` - MySQL host
+- `MYSQL_HOST=client-database` - MySQL host
 - `MYSQL_PORT=3306` - MySQL port
 - `MYSQL_DATABASE=client_db` - Database name
 
@@ -471,7 +525,7 @@ Reference this image in Kubernetes Job specs:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: db-backup
+  name: client-database-backup
 spec:
   template:
     spec:
@@ -483,7 +537,7 @@ spec:
         args: ["/app/scripts/jobHelpers/db-backup.sh"]
         env:
         - name: MYSQL_HOST
-          value: mysql-service
+          value: client-database
         # ... additional config
 ```
 

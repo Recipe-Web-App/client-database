@@ -196,7 +196,7 @@ db, err := sql.Open("mysql", dsn)
 
 **Connection Details:**
 
-- Host: `mysql-service` (within cluster)
+- Host: `client-database` (within cluster)
 - Port: `3306`
 - Database: `client_db`
 - User: `client_db_user` (read/write permissions)
@@ -277,8 +277,8 @@ This repository follows the structure and conventions of the recipe-database pro
 Check logs and resource availability:
 
 ```bash
-kubectl describe pod mysql-0 -n $NAMESPACE
-kubectl logs mysql-0 -n $NAMESPACE
+kubectl describe pod client-database-mysql-0 -n $NAMESPACE
+kubectl logs client-database-mysql-0 -n $NAMESPACE
 ```
 
 ### Auth-service can't connect
@@ -286,8 +286,8 @@ kubectl logs mysql-0 -n $NAMESPACE
 Verify service and credentials:
 
 ```bash
-kubectl get svc mysql-service -n $NAMESPACE
-kubectl get secret mysql-secrets -n $NAMESPACE -o yaml
+kubectl get svc client-database -n $NAMESPACE
+kubectl get secret client-database-secrets -n $NAMESPACE -o yaml
 ```
 
 ### Backup fails
