@@ -152,6 +152,108 @@ scan-security:  ## Scan for security vulnerabilities
 	pre-commit run --all-files trivyfs-docker
 
 # ============================================================================
+# Docker Commands
+# ============================================================================
+
+# Docker image configuration
+DOCKER_IMAGE ?= client-database-jobs
+DOCKER_TAG ?= latest
+DOCKER_REGISTRY ?=
+FULL_IMAGE_NAME = $(if $(DOCKER_REGISTRY),$(DOCKER_REGISTRY)/,)$(DOCKER_IMAGE):$(DOCKER_TAG)
+
+.PHONY: docker-build
+docker-build:  ## Build Docker image for Kubernetes Jobs
+	@echo "Building Docker image: $(FULL_IMAGE_NAME)"
+	docker build -f tools/Dockerfile -t $(FULL_IMAGE_NAME) .
+	@echo "✓ Image built successfully: $(FULL_IMAGE_NAME)"
+
+.PHONY: docker-build-nc
+docker-build-nc:  ## Build Docker image without cache (clean build)
+	@echo "Building Docker image (no cache): $(FULL_IMAGE_NAME)"
+	docker build --no-cache -f tools/Dockerfile -t $(FULL_IMAGE_NAME) .
+	@echo "✓ Image built successfully: $(FULL_IMAGE_NAME)"
+
+.PHONY: docker-tag
+docker-tag:  ## Tag Docker image (usage: make docker-tag DOCKER_TAG=v1.0.0)
+	@test -n "$(DOCKER_TAG)" || (echo "Error: DOCKER_TAG not specified. Usage: make docker-tag DOCKER_TAG=v1.0.0" && exit 1)
+	docker tag $(DOCKER_IMAGE):latest $(FULL_IMAGE_NAME)
+	@echo "✓ Image tagged: $(FULL_IMAGE_NAME)"
+
+.PHONY: docker-push
+docker-push:  ## Push Docker image to registry (usage: make docker-push DOCKER_REGISTRY=your-registry.io)
+	@test -n "$(DOCKER_REGISTRY)" || (echo "Error: DOCKER_REGISTRY not specified. Usage: make docker-push DOCKER_REGISTRY=your-registry.io" && exit 1)
+	docker push $(FULL_IMAGE_NAME)
+	@echo "✓ Image pushed: $(FULL_IMAGE_NAME)"
+
+.PHONY: docker-pull
+docker-pull:  ## Pull Docker image from registry
+	@test -n "$(DOCKER_REGISTRY)" || (echo "Error: DOCKER_REGISTRY not specified. Usage: make docker-pull DOCKER_REGISTRY=your-registry.io" && exit 1)
+	docker pull $(FULL_IMAGE_NAME)
+	@echo "✓ Image pulled: $(FULL_IMAGE_NAME)"
+
+.PHONY: docker-lint
+docker-lint:  ## Lint Dockerfile with hadolint
+	@echo "Linting Dockerfile..."
+	@command -v hadolint >/dev/null 2>&1 || { echo "Error: hadolint not installed. Install with: brew install hadolint (macOS) or see https://github.com/hadolint/hadolint"; exit 1; }
+	hadolint tools/Dockerfile
+	@echo "✓ Dockerfile lint passed"
+
+.PHONY: docker-scan
+docker-scan:  ## Security scan Docker image with trivy
+	@echo "Scanning image for vulnerabilities: $(FULL_IMAGE_NAME)"
+	@command -v trivy >/dev/null 2>&1 || { echo "Error: trivy not installed. Install with: brew install trivy (macOS) or see https://github.com/aquasecurity/trivy"; exit 1; }
+	trivy image --severity HIGH,CRITICAL $(FULL_IMAGE_NAME)
+	@echo "✓ Security scan complete"
+
+.PHONY: docker-scan-full
+docker-scan-full:  ## Full security scan (all severities)
+	@echo "Running full security scan: $(FULL_IMAGE_NAME)"
+	@command -v trivy >/dev/null 2>&1 || { echo "Error: trivy not installed"; exit 1; }
+	trivy image $(FULL_IMAGE_NAME)
+
+.PHONY: docker-inspect
+docker-inspect:  ## Inspect Docker image details
+	@echo "Image: $(FULL_IMAGE_NAME)"
+	@echo "---"
+	docker inspect $(FULL_IMAGE_NAME) | grep -A 10 "Config"
+	@echo "---"
+	@echo "Image size:"
+	docker images $(DOCKER_IMAGE) --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+
+.PHONY: docker-test
+docker-test:  ## Test Docker image locally (run basic commands)
+	@echo "Testing Docker image: $(FULL_IMAGE_NAME)"
+	@echo "1. Testing mysql client..."
+	docker run --rm $(FULL_IMAGE_NAME) mysql --version
+	@echo "2. Testing envsubst..."
+	docker run --rm $(FULL_IMAGE_NAME) envsubst --version
+	@echo "3. Testing golang-migrate..."
+	docker run --rm $(FULL_IMAGE_NAME) migrate -version
+	@echo "4. Testing bash..."
+	docker run --rm $(FULL_IMAGE_NAME) bash --version
+	@echo "5. Verifying SQL files..."
+	docker run --rm $(FULL_IMAGE_NAME) ls -la /app/sql/init/schema/
+	@echo "✓ All tests passed"
+
+.PHONY: docker-shell
+docker-shell:  ## Open interactive shell in Docker image
+	docker run --rm -it $(FULL_IMAGE_NAME) /bin/bash
+
+.PHONY: docker-clean
+docker-clean:  ## Remove Docker image locally
+	docker rmi $(FULL_IMAGE_NAME) || true
+	@echo "✓ Image removed: $(FULL_IMAGE_NAME)"
+
+.PHONY: docker-clean-all
+docker-clean-all:  ## Remove all versions of the Docker image
+	docker images $(DOCKER_IMAGE) -q | xargs -r docker rmi || true
+	@echo "✓ All $(DOCKER_IMAGE) images removed"
+
+.PHONY: docker-ci
+docker-ci: docker-lint docker-build docker-scan docker-test  ## Run full Docker CI pipeline (lint, build, scan, test)
+	@echo "✓ Docker CI pipeline completed successfully"
+
+# ============================================================================
 # Development Commands
 # ============================================================================
 
@@ -211,9 +313,12 @@ docs:  ## Open documentation
 check-deps:  ## Check if required tools are installed
 	@echo "Checking dependencies..."
 	@command -v kubectl >/dev/null 2>&1 && echo "✓ kubectl" || echo "✗ kubectl (required)"
+	@command -v docker >/dev/null 2>&1 && echo "✓ docker" || echo "✗ docker (required)"
 	@command -v envsubst >/dev/null 2>&1 && echo "✓ envsubst" || echo "✗ envsubst (required)"
 	@command -v pre-commit >/dev/null 2>&1 && echo "✓ pre-commit" || echo "✗ pre-commit (optional, for linting)"
 	@command -v mysql >/dev/null 2>&1 && echo "✓ mysql client" || echo "✗ mysql client (optional)"
+	@command -v hadolint >/dev/null 2>&1 && echo "✓ hadolint" || echo "✗ hadolint (optional, for Docker linting)"
+	@command -v trivy >/dev/null 2>&1 && echo "✓ trivy" || echo "✗ trivy (optional, for security scanning)"
 
 .PHONY: env-check
 env-check:  ## Check if .env file exists and is configured

@@ -1,0 +1,118 @@
+# Multi-stage Dockerfile for Client Database Kubernetes Jobs
+# This image is used for operational tasks: backup, restore, migrations, schema loading
+# The MySQL StatefulSet uses the official mysql:8.0 image directly
+
+# =============================================================================
+# Stage 1: Builder - Install tools and dependencies
+# =============================================================================
+FROM mysql:8.0 AS builder
+
+# Avoid interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies and tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        # Template substitution for Kubernetes manifests
+        gettext-base=0.21-* \
+        # Compression for backup files
+        gzip=1.10-* \
+        # Bash shell for scripts
+        bash=5.1-* \
+        # Download tools for golang-migrate
+        curl=7.81.0-* \
+        ca-certificates=* && \
+    # Clean up apt cache to reduce layer size
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install golang-migrate from GitHub releases
+# Using specific version for reproducibility
+ARG MIGRATE_VERSION=v4.17.0
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN curl -L "https://github.com/golang-migrate/migrate/releases/download/${MIGRATE_VERSION}/migrate.linux-amd64.tar.gz" | \
+    tar xvz -C /tmp && \
+    mv /tmp/migrate /usr/local/bin/migrate && \
+    chmod +x /usr/local/bin/migrate && \
+    # Verify installation
+    migrate -version
+
+# =============================================================================
+# Stage 2: Runtime - Minimal image for Jobs
+# =============================================================================
+FROM debian:bookworm-slim
+
+# Set locale to avoid encoding issues
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install only runtime dependencies (no build tools)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        # MySQL client for database operations
+        default-mysql-client=1.1.0-* \
+        # Template substitution
+        gettext-base=0.21-* \
+        # Compression/decompression
+        gzip=1.12-* \
+        # Shell interpreter
+        bash=5.2.15-* \
+        # CA certificates for TLS connections
+        ca-certificates=* && \
+    # Clean up
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy golang-migrate binary from builder stage
+COPY --from=builder /usr/local/bin/migrate /usr/local/bin/migrate
+
+# Create non-root user and group for security
+# UID/GID 10001 matches Kubernetes securityContext
+RUN groupadd -g 10001 jobuser && \
+    useradd -u 10001 -g jobuser -m -s /bin/bash jobuser
+
+# Create application directory structure
+RUN mkdir -p /app/sql/init/schema \
+             /app/sql/init/users \
+             /app/sql/fixtures \
+             /app/scripts/jobHelpers \
+             /backups \
+             /tmp/db-operations && \
+    # Set ownership to non-root user
+    chown -R jobuser:jobuser /app /backups /tmp/db-operations
+
+# Copy SQL initialization files
+COPY --chown=jobuser:jobuser db/init/schema/*.sql /app/sql/init/schema/
+COPY --chown=jobuser:jobuser db/init/users/*.sql /app/sql/init/users/
+COPY --chown=jobuser:jobuser db/fixtures/*.sql /app/sql/fixtures/
+
+# Copy job helper scripts (if they exist)
+# Note: scripts/jobHelpers/ will be added in future commits
+# COPY --chown=jobuser:jobuser scripts/jobHelpers/*.sh /app/scripts/jobHelpers/
+# RUN chmod +x /app/scripts/jobHelpers/*.sh
+
+# Set working directory
+WORKDIR /app
+
+# Switch to non-root user
+USER jobuser
+
+# Default environment variables (non-sensitive)
+# Sensitive values should come from Kubernetes Secrets
+ENV MYSQL_HOST=mysql-service \
+    MYSQL_PORT=3306 \
+    MYSQL_DATABASE=client_db
+
+# Signal handling (graceful shutdown on SIGTERM)
+STOPSIGNAL SIGTERM
+
+# Default command (can be overridden by Kubernetes Job)
+CMD ["/bin/bash"]
+
+# Metadata labels
+LABEL maintainer="Recipe Web App Team" \
+      description="Client Database Kubernetes Jobs Image" \
+      version="1.0.0" \
+      component="database-operations" \
+      database="mysql-8.0"

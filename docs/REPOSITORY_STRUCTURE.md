@@ -184,10 +184,35 @@ Comprehensive documentation for the repository.
 
 ### `tools/` - Container Tools
 
-Container images and tools for operations.
+Docker configuration for building custom container images used in Kubernetes deployments.
 
-- `Dockerfile` - Custom image with MySQL client and migration tools
-- Used by Kubernetes Jobs for database operations
+**Image Strategy:**
+
+- **MySQL StatefulSet**: Uses official `mysql:8.0` image directly (no customization)
+- **Kubernetes Jobs**: Uses custom `client-database-jobs` image (built from this directory)
+
+**Files:**
+
+- `Dockerfile` - Multi-stage Dockerfile for building the Jobs image
+- `.dockerignore` - Build context exclusions (reduces context size ~90%)
+- `README.md` - Comprehensive Docker documentation and usage guide
+
+**Jobs Image Contents:**
+
+- MySQL client tools (`mysql`, `mysqldump`) for database operations
+- `golang-migrate` for schema migrations
+- `envsubst` for template substitution
+- SQL initialization files (schema, users, fixtures)
+- Job helper scripts (backup, restore, migrations, schema loading)
+- Non-root user execution (UID 10001) for security
+
+**Build Best Practices:**
+
+- Multi-stage build (builder + minimal runtime)
+- Minimal base image (`debian:bookworm-slim`, ~150-200MB final size)
+- Version-pinned dependencies for reproducibility
+- Security scanning with hadolint and trivy
+- Non-root user for all operations
 
 ## File Naming Conventions
 
@@ -235,10 +260,10 @@ Container images and tools for operations.
 - **k8s/**: 10 files (5 core + 4 jobs + 1 README)
 - **migrations/**: 3 files (1 up + 1 down + 1 README)
 - **docs/**: 5 files
-- **tools/**: 1 file (Dockerfile)
+- **tools/**: 3 files (Dockerfile + .dockerignore + README.md)
 - **root**: 7 files (.env.example, .env, .gitignore, Makefile, README, CLAUDE, CHANGELOG)
 
-Total: ~54 files
+Total: ~56 files
 
 ## Design Philosophy
 
