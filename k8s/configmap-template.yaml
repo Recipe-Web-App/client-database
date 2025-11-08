@@ -20,6 +20,10 @@ data:
     character-set-server=utf8mb4
     collation-server=utf8mb4_unicode_ci
 
+    # Socket configuration (writable directory for read-only root filesystem)
+    socket=/var/run/mysqld/mysqld.sock
+    pid-file=/var/run/mysqld/mysqld.pid
+
     # Connection settings
     max_connections=50
     skip-name-resolve
@@ -39,6 +43,7 @@ data:
 
     [client]
     default-character-set=utf8mb4
+    socket=/var/run/mysqld/mysqld.sock
 
   # Database connection settings (non-sensitive)
   MYSQL_HOST: ${MYSQL_HOST}

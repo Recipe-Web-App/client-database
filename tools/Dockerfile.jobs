@@ -5,7 +5,7 @@
 # =============================================================================
 # Stage 1: Builder - Install tools and dependencies
 # =============================================================================
-FROM mysql:8.0 AS builder
+FROM debian:bookworm-slim AS builder
 
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -14,15 +14,15 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Bash shell for scripts
-        bash=5.1-* \
+        bash \
         # CA certificates for TLS connections
-        ca-certificates=* \
+        ca-certificates \
         # Download tools for golang-migrate
-        curl=7.81.0-* \
+        curl \
         # Template substitution for Kubernetes manifests
-        gettext-base=0.21-* \
+        gettext-base \
         # Compression for backup files
-        gzip=1.10-* && \
+        gzip && \
     # Clean up apt cache to reduce layer size
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -52,15 +52,15 @@ ENV LANG=C.UTF-8 \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Shell interpreter
-        bash=5.2.15-* \
+        bash \
         # CA certificates for TLS connections
-        ca-certificates=* \
+        ca-certificates \
         # MySQL client for database operations
-        default-mysql-client=1.1.0-* \
+        default-mysql-client \
         # Template substitution
-        gettext-base=0.21-* \
+        gettext-base \
         # Compression/decompression
-        gzip=1.12-* && \
+        gzip && \
     # Clean up
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

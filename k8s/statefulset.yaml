@@ -32,6 +32,13 @@ spec:
           image: client-database-mysql:latest
           imagePullPolicy: IfNotPresent
 
+          command:
+            - docker-entrypoint.sh
+          args:
+            - mysqld
+            - --socket=/var/run/mysqld/mysqld.sock
+            - --pid-file=/var/run/mysqld/mysqld.pid
+
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -80,27 +87,29 @@ spec:
           livenessProbe:
             exec:
               command:
-                - mysqladmin
-                - ping
-                - -h
-                - localhost
+                - /bin/sh
+                - -c
+                - mysqladmin ping -h localhost -uroot -p${MYSQL_ROOT_PASSWORD}
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
+            failureThreshold: 3
 
           readinessProbe:
             exec:
               command:
-                - mysql
-                - -h
-                - 127.0.0.1
-                - -e
-                - SELECT 1
-            initialDelaySeconds: 5
-            periodSeconds: 2
-            timeoutSeconds: 1
+                - /bin/sh
+                - -c
+                - mysql -h 127.0.0.1 -uroot -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1"
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
 
       volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: client-database-pvc
         - name: mysql-config
           configMap:
             name: client-database-config
@@ -111,15 +120,3 @@ spec:
           emptyDir: {}
         - name: run
           emptyDir: {}
-
-  volumeClaimTemplates:
-    - metadata:
-        name: mysql-data
-        labels:
-          app: client-database
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 10Gi

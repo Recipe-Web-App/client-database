@@ -31,8 +31,6 @@ RUN microdnf install -y \
         bind-utils \
         # Compression for database backups
         gzip \
-        # Interactive process viewer
-        htop \
         # Network connectivity testing
         iputils \
         # Pager for viewing logs
