@@ -1,0 +1,102 @@
+# Kubernetes Job for Database Migrations
+# Runs golang-migrate to apply schema migrations
+# Uses maintenance user (not root) for migrations
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: client-database-migrate
+  namespace: client-database
+  labels:
+    app: client-database
+    component: migrate
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: client-database
+        component: migrate
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+
+      securityContext:
+        fsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+
+      containers:
+        - name: migrate
+          image: client-database-jobs:latest
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: 512Mi
+
+          command: ["/bin/bash"]
+          args: ["/app/scripts/jobHelpers/db-migrate.sh"]
+
+          env:
+            # Connection info from ConfigMap
+            - name: MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: client-database-config
+                  key: MYSQL_HOST
+            - name: MYSQL_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: client-database-config
+                  key: MYSQL_PORT
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: client-database-config
+                  key: MYSQL_DATABASE
+            # Credentials from Secret (use maintenance user for migrations)
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: client-database-secrets
+                  key: DB_MAINT_USERNAME
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: client-database-secrets
+                  key: DB_MAINT_PASSWORD
+
+          volumeMounts:
+            - name: mysql-config
+              mountPath: /etc/mysql/conf.d
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        # MySQL configuration from ConfigMap
+        - name: mysql-config
+          configMap:
+            name: client-database-config
+            items:
+              - key: my.cnf
+                path: my.cnf
+        # Temporary storage
+        - name: tmp
+          emptyDir: {}

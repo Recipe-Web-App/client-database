@@ -1,0 +1,17 @@
+# PersistentVolumeClaim for MySQL database storage
+# Consistent naming with other database PVCs (recipe-database-pvc, session-database-pvc)
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: client-database-pvc
+  namespace: client-database
+  labels:
+    app: client-database
+    component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

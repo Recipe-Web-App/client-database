@@ -1,0 +1,47 @@
+# .dockerignore.mysql - Build context exclusions for MySQL Dockerfile
+# This file is used when building the MySQL server image for the StatefulSet
+
+# The MySQL image only needs the Dockerfile itself - no repository files are copied
+# Configuration is provided via Kubernetes ConfigMap (my.cnf)
+# Credentials are provided via Kubernetes Secrets
+
+# Version control
+.git/
+.gitignore
+.github/
+
+# Documentation
+*.md
+docs/
+
+# Local development
+.env
+.env.*
+
+# Kubernetes manifests (not needed in image)
+k8s/
+
+# Database data and backups (not needed in image)
+db/
+
+# Scripts (not needed in MySQL server image - only in Jobs image)
+scripts/
+
+# Tools and build artifacts
+tools/*.jobs
+tools/.dockerignore.jobs
+tools/README.md
+
+# Migration files (not needed in server image - used by Jobs)
+migrations/
+
+# CI/CD
+.pre-commit-config.yaml
+Makefile
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

@@ -62,7 +62,7 @@ Edit `.env` with your specific values:
 
 ```bash
 # MySQL Connection
-MYSQL_HOST=mysql-service
+MYSQL_HOST=client-database
 MYSQL_PORT=3306
 MYSQL_DATABASE=client_db
 MYSQL_ROOT_PASSWORD=<generate-strong-password>
@@ -72,9 +72,9 @@ MYSQL_BACKUP_USER=backup_user
 MYSQL_BACKUP_PASSWORD=<generate-strong-password>
 
 # Kubernetes
-NAMESPACE=default
-STATEFULSET_NAME=mysql
-SERVICE_NAME=mysql-service
+NAMESPACE=client-database
+STATEFULSET_NAME=client-database-mysql
+SERVICE_NAME=client-database
 
 # Backup
 BACKUP_RETENTION_DAYS=30
@@ -115,7 +115,7 @@ envsubst < k8s/secret-template.yaml | kubectl apply -f -
 Verify:
 
 ```bash
-kubectl get secrets mysql-secrets -n $NAMESPACE
+kubectl get secrets client-database-secrets -n $NAMESPACE
 ```bash
 
 #### 2.3 Deploy ConfigMap
@@ -129,8 +129,8 @@ envsubst < k8s/configmap-template.yaml | kubectl apply -f -
 Verify:
 
 ```bash
-kubectl get configmap mysql-config -n $NAMESPACE
-kubectl describe configmap mysql-config -n $NAMESPACE
+kubectl get configmap client-database-config -n $NAMESPACE
+kubectl describe configmap client-database-config -n $NAMESPACE
 ```bash
 
 #### 2.4 Create Persistent Volume Claim
@@ -173,7 +173,7 @@ kubectl wait --for=condition=ready pod -l app=client-database -n $NAMESPACE --ti
 Check status:
 
 ```bash
-kubectl get statefulset mysql -n $NAMESPACE
+kubectl get statefulset client-database-mysql -n $NAMESPACE
 kubectl get pods -l app=client-database -n $NAMESPACE
 ```bash
 
@@ -188,8 +188,8 @@ kubectl apply -f k8s/service.yaml
 Verify:
 
 ```bash
-kubectl get svc mysql-service -n $NAMESPACE
-kubectl describe svc mysql-service -n $NAMESPACE
+kubectl get svc client-database -n $NAMESPACE
+kubectl describe svc client-database -n $NAMESPACE
 ```bash
 
 ### Phase 3: Database Initialization
@@ -263,7 +263,7 @@ Update auth-service environment variables or Secret:
 ```yaml
 env:
 - name: MYSQL_HOST
-  value: mysql-service.default.svc.cluster.local  # or mysql-service if same namespace
+  value: client-database.default.svc.cluster.local  # or client-database if same namespace
 - name: MYSQL_PORT
   value: "3306"
 - name: MYSQL_DATABASE
@@ -271,12 +271,12 @@ env:
 - name: MYSQL_USER
   valueFrom:
     secretKeyRef:
-      name: mysql-secrets
+      name: client-database-secrets
       key: MYSQL_USER
 - name: MYSQL_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: mysql-secrets
+      name: client-database-secrets
       key: MYSQL_PASSWORD
 ```bash
 
@@ -286,7 +286,7 @@ From auth-service pod:
 
 ```bash
 kubectl exec -it <auth-service-pod> -n <namespace> -- sh
-mysql -h mysql-service -u client_db_user -p client_db
+mysql -h client-database -u client_db_user -p client_db
 # Enter password when prompted
 ```bash
 
@@ -304,21 +304,18 @@ Create first backup:
 
 ```bash
 ./scripts/dbManagement/backup-db.sh
-```bash
+```
 
 This script will:
 
-1. Detect the absolute path to your repository
-2. Create a Kubernetes Job with hostPath mount to `db/data/backups/`
-3. Run mysqldump inside the Job pod
-4. Save backup to `db/data/backups/clients-<timestamp>.sql.gz`
+1. Load environment variables from `.env`
+2. Find the running MySQL pod
+3. Execute `kubectl exec ... mysqldump` and stream output
+4. Compress and save to `db/data/backups/client_db_backup_<timestamp>.sql.gz`
+5. Show database statistics and backup size
+6. Automatically clean up old backups (keeps last 5)
 
-Monitor:
-
-```bash
-kubectl get jobs -n $NAMESPACE
-kubectl logs -f job/db-backup-<timestamp> -n $NAMESPACE
-```bash
+The backup executes immediately with no Job scheduling delay.
 
 #### 5.2 Verify Backup
 
@@ -326,26 +323,30 @@ List backups in your local repository:
 
 ```bash
 ls -lh db/data/backups/
-```bash
+```
 
 Expected output:
 
-```bash
--rw-r--r-- 1 user user 1.2K Jan  6 12:00 clients-20250106-120000.sql.gz
-```bash
+```text
+-rw-r--r-- 1 user user 1.2K Jan  6 12:00 client_db_backup_2025-01-06_12-00-00.sql.gz
+```
 
 The backup is now stored locally in your repository and can be:
 
-- Committed to version control (not recommended for production data)
 - Copied to external storage (S3, network drive, etc.)
 - Used for restore operations
+- Kept in version control (not recommended for production data)
 
 #### 5.3 Test Restore (Optional)
 
 In non-production environment, test restore procedure:
 
 ```bash
-./scripts/dbManagement/restore-db.sh clients-20250106-120000.sql.gz
+# Restore specific backup
+./scripts/dbManagement/restore-db.sh client_db_backup_2025-01-06_12-00-00.sql.gz
+
+# Or restore latest backup automatically
+./scripts/dbManagement/restore-db.sh
 ```bash
 
 **Warning**: This stops the database and restores data. Only run in test environments.
@@ -451,7 +452,7 @@ Schema saved to `db/data/exports/schema-$(date).sql`.
 Check slow query log:
 
 ```bash
-kubectl exec -it mysql-0 -n $NAMESPACE -- tail -f /var/log/mysql/slow.log
+kubectl exec -it client-database-mysql-0 -n $NAMESPACE -- tail -f /var/log/mysql/slow.log
 ```bash
 
 #### Backup Test
@@ -526,19 +527,19 @@ This updates the ConfigMap and restarts MySQL.
 <!-- markdownlint-disable MD029 -->
 1. Check logs:
    ```bash
-   kubectl logs mysql-0 -n $NAMESPACE --previous
+   kubectl logs client-database-mysql-0 -n $NAMESPACE --previous
    ```
 
 2. Describe pod:
 
    ```bash
-   kubectl describe pod mysql-0 -n $NAMESPACE
+   kubectl describe pod client-database-mysql-0 -n $NAMESPACE
    ```
 
 3. If PVC is healthy, delete pod (StatefulSet recreates it):
 
    ```bash
-   kubectl delete pod mysql-0 -n $NAMESPACE
+   kubectl delete pod client-database-mysql-0 -n $NAMESPACE
    ```
 <!-- markdownlint-enable MD029 -->
 
@@ -663,8 +664,8 @@ Add mysql_exporter sidecar for detailed metrics:
 **Diagnosis**:
 
 ```bash
-kubectl describe pod mysql-0 -n $NAMESPACE
-kubectl logs mysql-0 -n $NAMESPACE
+kubectl describe pod client-database-mysql-0 -n $NAMESPACE
+kubectl logs client-database-mysql-0 -n $NAMESPACE
 ```bash
 
 **Common Causes**:
@@ -682,13 +683,13 @@ kubectl logs mysql-0 -n $NAMESPACE
 
 ```bash
 # Test from auth-service pod
-kubectl exec -it <auth-service-pod> -n <namespace> -- nc -zv mysql-service 3306
+kubectl exec -it <auth-service-pod> -n <namespace> -- nc -zv client-database 3306
 
 # Check MySQL logs
-kubectl logs mysql-0 -n $NAMESPACE | grep -i error
+kubectl logs client-database-mysql-0 -n $NAMESPACE | grep -i error
 
 # Verify Secret
-kubectl get secret mysql-secrets -n $NAMESPACE -o yaml
+kubectl get secret client-database-secrets -n $NAMESPACE -o yaml
 ```bash
 
 **Common Causes**:
@@ -698,24 +699,30 @@ kubectl get secret mysql-secrets -n $NAMESPACE -o yaml
 - MySQL user not created
 - Network policy blocking traffic
 
-### Issue: Backup Job fails
+### Issue: Backup fails
 
-**Symptoms**: Job status shows `Failed`
+**Symptoms**: Backup script exits with error
 
 **Diagnosis**:
 
 ```bash
-kubectl logs job/db-backup-<timestamp> -n $NAMESPACE
-kubectl describe job/db-backup-<timestamp> -n $NAMESPACE
-```bash
+# Check if MySQL pod is running
+kubectl get pods -n $NAMESPACE -l app=client-database,component=mysql
+
+# Check kubectl connectivity
+kubectl exec -n $NAMESPACE client-database-mysql-0 -- mysql --version
+
+# Verify credentials in .env
+cat .env | grep DB_MAINT
+```
 
 **Common Causes**:
 
-- hostPath not accessible (check node has access to repository path)
+- MySQL pod not running (check pod status)
 - Insufficient disk space on local filesystem
-- MySQL not accessible from Job pod (check Service connectivity)
-- Wrong credentials in Secret
-- Repository path incorrect (must be absolute path)
+- Wrong credentials in `.env` file
+- kubectl cannot access cluster
+- Network connectivity issues
 
 ### Issue: Slow queries
 
@@ -941,7 +948,7 @@ After successful deployment:
 
 | Variable | Description | Example | Required |
 |----------|-------------|---------|----------|
-| `MYSQL_HOST` | MySQL hostname | `mysql-service` | Yes |
+| `MYSQL_HOST` | MySQL hostname | `client-database` | Yes |
 | `MYSQL_PORT` | MySQL port | `3306` | Yes |
 | `MYSQL_DATABASE` | Database name | `client_db` | Yes |
 | `MYSQL_ROOT_PASSWORD` | Root password | `<secure-password>` | Yes |
@@ -949,9 +956,9 @@ After successful deployment:
 | `MYSQL_PASSWORD` | Application password | `<secure-password>` | Yes |
 | `MYSQL_BACKUP_USER` | Backup user | `backup_user` | Yes |
 | `MYSQL_BACKUP_PASSWORD` | Backup password | `<secure-password>` | Yes |
-| `NAMESPACE` | Kubernetes namespace | `default` | Yes |
-| `STATEFULSET_NAME` | StatefulSet name | `mysql` | Yes |
-| `SERVICE_NAME` | Service name | `mysql-service` | Yes |
+| `NAMESPACE` | Kubernetes namespace | `client-database` | Yes |
+| `STATEFULSET_NAME` | StatefulSet name | `client-database-mysql` | Yes |
+| `SERVICE_NAME` | Service name | `client-database` | Yes |
 | `BACKUP_RETENTION_DAYS` | Backup retention | `30` | No |
 
 ## Appendix: Useful Commands
@@ -963,13 +970,13 @@ After successful deployment:
 kubectl get pods -l app=client-database -n $NAMESPACE -w
 
 # View logs (follow)
-kubectl logs -f mysql-0 -n $NAMESPACE
+kubectl logs -f client-database-mysql-0 -n $NAMESPACE
 
 # Execute command in pod
-kubectl exec -it mysql-0 -n $NAMESPACE -- bash
+kubectl exec -it client-database-mysql-0 -n $NAMESPACE -- bash
 
 # Port forward (local MySQL access)
-kubectl port-forward svc/mysql-service 3306:3306 -n $NAMESPACE
+kubectl port-forward svc/client-database 3306:3306 -n $NAMESPACE
 
 # Delete all resources
 kubectl delete statefulset,service,pvc,configmap,secret -l app=client-database -n $NAMESPACE
@@ -979,7 +986,7 @@ kubectl delete statefulset,service,pvc,configmap,secret -l app=client-database -
 
 ```bash
 # Connect to MySQL
-mysql -h mysql-service -u root -p client_db
+mysql -h client-database -u root -p client_db
 
 # Show databases
 SHOW DATABASES;
@@ -1004,7 +1011,7 @@ SHOW GRANTS FOR 'client_db_user'@'%';
 ls -lh db/data/backups/
 
 # Manual backup (if Job script fails)
-kubectl exec mysql-0 -n $NAMESPACE -- mysqldump -uroot -p$MYSQL_ROOT_PASSWORD --single-transaction client_db | gzip > db/data/backups/manual-backup-$(date +%Y%m%d).sql.gz
+kubectl exec client-database-mysql-0 -n $NAMESPACE -- mysqldump -uroot -p$MYSQL_ROOT_PASSWORD --single-transaction client_db | gzip > db/data/backups/manual-backup-$(date +%Y%m%d).sql.gz
 
 # Manual restore (if Job script fails)
 ./scripts/containerManagement/stop-container.sh

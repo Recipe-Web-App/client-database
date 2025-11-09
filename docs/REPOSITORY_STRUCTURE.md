@@ -41,11 +41,9 @@ client-database/
 │   │   ├── migrate.sh
 │   │   ├── restore-db.sh
 │   │   └── verify-health.sh
-│   ├── jobHelpers/                  # Scripts for Kubernetes jobs (4 files)
-│   │   ├── db-backup.sh
+│   ├── jobHelpers/                  # Scripts for Kubernetes jobs (2 files)
 │   │   ├── db-load-schema.sh
-│   │   ├── db-migrate.sh
-│   │   └── db-restore.sh
+│   │   └── db-load-test-fixtures.sh
 │   └── utils/                       # Shared utility functions
 │       └── common.sh
 ├── k8s/                             # Kubernetes manifests
@@ -55,11 +53,10 @@ client-database/
 │   ├── service.yaml                 # MySQL Service (port 3306)
 │   ├── pvc.yaml                     # Database storage PVC
 │   ├── README.md                    # K8s resource documentation
-│   └── jobs/                        # Kubernetes Job manifests (4 files)
-│       ├── db-backup-job.yaml       # Job with hostPath to db/data/backups/
-│       ├── db-load-schema-job.yaml
-│       ├── db-migrate-job.yaml
-│       └── db-restore-job.yaml      # Job with hostPath to db/data/backups/
+│   └── jobs/                        # Kubernetes Job manifests (3 files)
+│       ├── db-load-schema-job.yaml  # Loads initial schema and creates users
+│       ├── db-load-test-fixtures-job.yaml  # Loads test data
+│       └── db-migrate-job.yaml      # Runs golang-migrate for schema changes
 ├── migrations/                      # Schema migrations (golang-migrate)
 │   ├── 000001_initial_schema.up.sql
 │   ├── 000001_initial_schema.down.sql
@@ -159,10 +156,12 @@ All Kubernetes resource definitions for deploying MySQL.
 
 #### k8s/jobs/
 
-- Job templates for one-time operations
-- Backup and restore Jobs use hostPath volumes to mount `db/data/backups/` from repository
-- Schema loading and migration Jobs
-- Triggered manually via scripts, dynamically configured with repository path
+- Job templates for initialization operations
+- Schema loading Job: Executes SQL files from `db/init/schema/` and `db/init/users/`
+- Test fixtures Job: Loads sample data from `db/fixtures/`
+- Migration Job: Runs golang-migrate for schema changes
+- Triggered manually via dbManagement scripts
+- Note: Backup/restore use direct kubectl exec (not Jobs)
 
 ### `migrations/` - Schema Migrations
 
@@ -184,10 +183,35 @@ Comprehensive documentation for the repository.
 
 ### `tools/` - Container Tools
 
-Container images and tools for operations.
+Docker configuration for building custom container images used in Kubernetes deployments.
 
-- `Dockerfile` - Custom image with MySQL client and migration tools
-- Used by Kubernetes Jobs for database operations
+**Image Strategy:**
+
+- **MySQL StatefulSet**: Uses official `mysql:8.0` image directly (no customization)
+- **Kubernetes Jobs**: Uses custom `client-database-jobs` image (built from this directory)
+
+**Files:**
+
+- `Dockerfile` - Multi-stage Dockerfile for building the Jobs image
+- `.dockerignore` - Build context exclusions (reduces context size ~90%)
+- `README.md` - Comprehensive Docker documentation and usage guide
+
+**Jobs Image Contents:**
+
+- MySQL client tools (`mysql`, `mysqldump`) for database operations
+- `golang-migrate` for schema migrations
+- `envsubst` for template substitution
+- SQL initialization files (schema, users, fixtures)
+- Job helper scripts (backup, restore, migrations, schema loading)
+- Non-root user execution (UID 10001) for security
+
+**Build Best Practices:**
+
+- Multi-stage build (builder + minimal runtime)
+- Minimal base image (`debian:bookworm-slim`, ~150-200MB final size)
+- Version-pinned dependencies for reproducibility
+- Security scanning with hadolint and trivy
+- Non-root user for all operations
 
 ## File Naming Conventions
 
@@ -235,10 +259,10 @@ Container images and tools for operations.
 - **k8s/**: 10 files (5 core + 4 jobs + 1 README)
 - **migrations/**: 3 files (1 up + 1 down + 1 README)
 - **docs/**: 5 files
-- **tools/**: 1 file (Dockerfile)
+- **tools/**: 3 files (Dockerfile + .dockerignore + README.md)
 - **root**: 7 files (.env.example, .env, .gitignore, Makefile, README, CLAUDE, CHANGELOG)
 
-Total: ~54 files
+Total: ~56 files
 
 ## Design Philosophy
 
@@ -261,7 +285,7 @@ This structure mirrors recipe-database with these adaptations:
 - **No monitoring stack** - Can add prometheus-exporter later if needed
 - **Fewer fixtures** - Only sample OAuth2 clients
 - **golang-migrate** - Instead of custom migration scripts
-- **hostPath backups** - Backups stored in repository using hostPath volumes, not separate PVC
+- **Direct kubectl exec backups** - Backups stream to local filesystem, no Jobs/volumes needed
 
-The core organizational principles remain the same: hierarchical scripts, numbered schema files, Job-based operations,
+The core organizational principles remain the same: hierarchical scripts, numbered schema files, Job-based initialization,
 and comprehensive documentation.

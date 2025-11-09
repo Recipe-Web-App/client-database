@@ -1,0 +1,91 @@
+# Dockerfile.mysql - Production-ready MySQL 8.0 image for client-database StatefulSet
+#
+# This image extends the official MySQL 8.0 image with:
+# - Security hardening
+# - Monitoring and debugging tools
+# - Health check utilities
+# - Production best practices
+#
+# Build: docker build -f tools/Dockerfile.mysql -t client-database-mysql:latest .
+# Usage: Used by k8s/statefulset.yaml for the MySQL database pod
+
+# =============================================================================
+# Stage 1: Base MySQL with production tools
+# =============================================================================
+FROM mysql:8.0 AS base
+
+# Metadata
+LABEL maintainer="Recipe Web App Team"
+LABEL description="Production-ready MySQL 8.0 server for client-database OAuth2 credentials"
+LABEL version="1.0"
+LABEL component="database-server"
+
+# Install production utilities and monitoring tools
+# MySQL 8.0 image is based on Oracle Linux, so we use microdnf
+RUN microdnf install -y \
+        # Backup utilities
+        bzip2 \
+        # HTTP client for health checks and API testing
+        curl \
+        # DNS lookup tools (dig, nslookup)
+        bind-utils \
+        # Compression for database backups
+        gzip \
+        # Network connectivity testing
+        iputils \
+        # Pager for viewing logs
+        less \
+        # TCP/UDP port testing and debugging
+        nmap-ncat \
+        # Process utilities (ps, top, kill)
+        procps-ng \
+        # Protocol debugging and port testing
+        telnet \
+        # Minimal text editor
+        vim-minimal \
+        # HTTP client for downloading files
+        wget \
+    # Cleanup
+    && microdnf clean all \
+    # Create directory for custom scripts (if needed in future)
+    && mkdir -p /docker-entrypoint-initdb.d /etc/mysql/scripts \
+    # Set secure file permissions
+    && chmod 755 /docker-entrypoint-initdb.d /etc/mysql/scripts
+
+# =============================================================================
+# Stage 2: Final production image
+# =============================================================================
+FROM base AS production
+
+# Security: Run MySQL as mysql user (UID 999) - already default in official image
+# This is enforced by Kubernetes securityContext in statefulset.yaml
+
+# Environment variables (can be overridden by Kubernetes ConfigMap/Secret)
+ENV MYSQL_ROOT_HOST='%' \
+    MYSQL_LOG_CONSOLE=true
+
+# Expose MySQL port
+EXPOSE 3306
+
+# NOTE: No HEALTHCHECK directive - Kubernetes handles health checks via
+# liveness and readiness probes defined in k8s/statefulset.yaml
+
+# Use official MySQL entrypoint script
+# This handles:
+# - Initialization of data directory
+# - User creation
+# - Running scripts in /docker-entrypoint-initdb.d/
+# - Starting mysqld
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# Default command: start MySQL server
+CMD ["mysqld"]
+
+# =============================================================================
+# Build Arguments (for future use)
+# =============================================================================
+# ARG MYSQL_VERSION=8.0
+# ARG BUILD_DATE
+# ARG VCS_REF
+# LABEL org.label-schema.build-date=$BUILD_DATE
+# LABEL org.label-schema.vcs-ref=$VCS_REF

@@ -1,0 +1,98 @@
+# Docker build context exclusions for client-database repository
+# This file reduces build context size and prevents accidental secret inclusion
+
+# Version control
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Environment and secrets (NEVER include in image)
+.env
+.env.*
+*.env
+.envrc
+
+# Backup and export data (large files, not needed in image)
+db/data/backups/**
+db/data/exports/**
+
+# Kubernetes manifests (not needed in image - used by kubectl)
+k8s/
+*.yaml
+*.yml
+
+# Scripts that run on local machine (not in container)
+scripts/containerManagement/
+scripts/dbManagement/
+
+# Migrations directory (if using golang-migrate with external files)
+# migrations/
+
+# Documentation (not needed in runtime image)
+docs/
+*.md
+!tools/README.md
+LICENSE
+CHANGELOG.md
+
+# Development and testing files
+tests/
+test/
+*.test
+*.spec.js
+coverage/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# CI/CD configuration
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Pre-commit and linting
+.pre-commit-config.yaml
+.pre-commit-hooks.yaml
+.hadolint.yaml
+.yamllint
+.markdownlint.json
+
+# Build artifacts and logs
+*.log
+logs/
+tmp/
+temp/
+build/
+dist/
+node_modules/
+
+# Container images and archives
+*.tar
+*.tar.gz
+*.zip
+*.img
+
+# OS-specific files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Include what we DO need
+!db/init/schema/*.sql
+!db/init/users/*.sql
+!db/fixtures/*.sql
+!scripts/jobHelpers/*.sh
+!tools/Dockerfile
+!tools/README.md

@@ -1,0 +1,23 @@
+# Headless Service for MySQL StatefulSet
+# Provides stable DNS names for StatefulSet pods
+# DNS: client-database.client-database.svc.cluster.local
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-database
+  namespace: client-database
+  labels:
+    app: client-database
+    component: mysql
+spec:
+  type: ClusterIP
+  clusterIP: None # Headless service for StatefulSet
+  ports:
+    - port: 3306
+      targetPort: 3306
+      protocol: TCP
+      name: mysql
+  selector:
+    app: client-database
+    component: mysql

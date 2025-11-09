@@ -13,8 +13,9 @@ auth-service.
 - **MySQL 8.0** with InnoDB for ACID compliance and performance
 - **Kubernetes-native** deployment using StatefulSets
 - **Read-optimized** for fast credential lookups
-- **Job-based operations** for backups, restores, and migrations
-- **hostPath backups** stored directly in repository
+- **Direct kubectl exec operations** for backup/restore (simple streaming approach)
+- **Job-based operations** for schema initialization and migrations
+- **Local backups** stored in repository (`db/data/backups/`)
 - **Schema migrations** using golang-migrate
 - **Security-focused** with bcrypt hashing and encryption at rest
 
@@ -22,33 +23,57 @@ auth-service.
 
 ### Prerequisites
 
+**Required:**
+
 - Kubernetes cluster (1.20+)
 - kubectl configured
+- Docker (20.10+) for building container images
 - envsubst (GNU gettext)
 - 10Gi available storage
 
+**Optional (for development):**
+
+- hadolint (Dockerfile linting)
+- trivy (security scanning)
+- pre-commit (automated linting)
+- mysql client (database access)
+
 ### Installation
 
-1. **Configure environment**:
+1. **Check dependencies**:
+
+   ```bash
+   make check-deps
+   ```
+
+2. **Build Docker image**:
+
+   ```bash
+   make docker-build
+   ```
+
+   This builds the custom Jobs image used for database operations (backup, restore, migrations, schema loading).
+
+3. **Configure environment**:
 
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
-2. **Deploy to Kubernetes**:
+4. **Deploy to Kubernetes**:
 
    ```bash
    ./scripts/containerManagement/deploy-container.sh
    ```
 
-3. **Initialize database**:
+5. **Initialize database**:
 
    ```bash
    ./scripts/dbManagement/load-schema.sh
    ```
 
-4. **Verify deployment**:
+6. **Verify deployment**:
 
    ```bash
    ./scripts/containerManagement/get-container-status.sh
@@ -71,7 +96,43 @@ client-database/
 
 ## Operations
 
-### Backup Database
+### Docker Operations
+
+**Build Jobs image:**
+
+```bash
+make docker-build
+```
+
+**Test the image:**
+
+```bash
+make docker-test
+```
+
+**Lint Dockerfile:**
+
+```bash
+make docker-lint
+```
+
+**Security scan:**
+
+```bash
+make docker-scan
+```
+
+**Full CI pipeline (lint + build + scan + test):**
+
+```bash
+make docker-ci
+```
+
+See `tools/README.md` for comprehensive Docker documentation.
+
+### Database Operations
+
+**Backup Database:**
 
 ```bash
 ./scripts/dbManagement/backup-db.sh
@@ -79,25 +140,25 @@ client-database/
 
 Backups are stored in `db/data/backups/` with timestamp naming.
 
-### Restore Database
+**Restore Database:**
 
 ```bash
 ./scripts/dbManagement/restore-db.sh clients-20250106-120000.sql.gz
 ```
 
-### Connect to Database
+**Connect to Database:**
 
 ```bash
 ./scripts/dbManagement/db-connect.sh
 ```
 
-### Run Migrations
+**Run Migrations:**
 
 ```bash
 ./scripts/dbManagement/migrate.sh
 ```
 
-### Check Status
+**Check Status:**
 
 ```bash
 ./scripts/containerManagement/get-container-status.sh
@@ -136,7 +197,7 @@ db, err := sql.Open("mysql", dsn)
 
 **Connection Details:**
 
-- Host: `mysql-service` (within cluster)
+- Host: `client-database` (within cluster)
 - Port: `3306`
 - Database: `client_db`
 - User: `client_db_user` (read/write permissions)
@@ -156,7 +217,7 @@ Comprehensive documentation is available in the `docs/` directory:
 - **Platform**: Kubernetes
 - **Storage**: PersistentVolumeClaim (ReadWriteOnce)
 - **Migrations**: golang-migrate
-- **Backup**: mysqldump with hostPath volumes
+- **Backup/Restore**: mysqldump via kubectl exec (streams to/from local filesystem)
 - **Scripting**: Bash
 
 ## Security
@@ -217,8 +278,8 @@ This repository follows the structure and conventions of the recipe-database pro
 Check logs and resource availability:
 
 ```bash
-kubectl describe pod mysql-0 -n $NAMESPACE
-kubectl logs mysql-0 -n $NAMESPACE
+kubectl describe pod client-database-mysql-0 -n $NAMESPACE
+kubectl logs client-database-mysql-0 -n $NAMESPACE
 ```
 
 ### Auth-service can't connect
@@ -226,8 +287,8 @@ kubectl logs mysql-0 -n $NAMESPACE
 Verify service and credentials:
 
 ```bash
-kubectl get svc mysql-service -n $NAMESPACE
-kubectl get secret mysql-secrets -n $NAMESPACE -o yaml
+kubectl get svc client-database -n $NAMESPACE
+kubectl get secret client-database-secrets -n $NAMESPACE -o yaml
 ```
 
 ### Backup fails

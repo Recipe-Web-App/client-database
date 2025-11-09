@@ -1,0 +1,55 @@
+# ConfigMap for MySQL configuration and connection settings
+# Uses envsubst for variable substitution from .env file
+# Usage: envsubst < configmap-template.yaml | kubectl apply -f -
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: client-database-config
+  namespace: client-database
+  labels:
+    app: client-database
+    component: config
+data:
+  # MySQL server configuration
+  my.cnf: |
+    # MySQL 8.0 Configuration for Client Database
+
+    [mysqld]
+    # Character set configuration (full Unicode support)
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+
+    # Socket configuration (writable directory for read-only root filesystem)
+    socket=/var/run/mysqld/mysqld.sock
+    pid-file=/var/run/mysqld/mysqld.pid
+
+    # Connection settings
+    max_connections=50
+    skip-name-resolve
+
+    # InnoDB settings
+    innodb_buffer_pool_size=256M
+
+    # Query logging
+    slow_query_log=1
+    long_query_time=2
+
+    # Authentication
+    default_authentication_plugin=mysql_native_password
+
+    [mysql]
+    default-character-set=utf8mb4
+
+    [client]
+    default-character-set=utf8mb4
+    socket=/var/run/mysqld/mysqld.sock
+
+  # Database connection settings (non-sensitive)
+  MYSQL_HOST: ${MYSQL_HOST}
+  MYSQL_PORT: "${MYSQL_PORT}"
+  MYSQL_DATABASE: ${MYSQL_DATABASE}
+
+  # Usernames (non-sensitive, available to Jobs/Pods)
+  DB_MAINT_USERNAME: ${DB_MAINT_USERNAME}
+  AUTH_SERVICE_USERNAME: ${AUTH_SERVICE_USERNAME}

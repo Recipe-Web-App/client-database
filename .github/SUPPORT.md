@@ -74,8 +74,8 @@ A:
 A:
 
 ```bash
-kubectl delete pvc mysql-data-mysql-0 -n <namespace>
-kubectl delete pod mysql-0 -n <namespace>
+kubectl delete pvc mysql-data-client-database-mysql-0 -n <namespace>
+kubectl delete pod client-database-mysql-0 -n <namespace>
 ```
 
 **Warning**: This deletes all data!
@@ -96,7 +96,7 @@ make deploy ENV=development NAMESPACE=dev
 A:
 
 ```bash
-kubectl exec -it mysql-0 -n <namespace> -- mysql -u db-maint-user -p < db/queries/monitoring/health_check.sql
+kubectl exec -it client-database-mysql-0 -n <namespace> -- mysql -u db-maint-user -p < db/queries/monitoring/health_check.sql
 ```
 
 **Q: Can I use this in production?**
