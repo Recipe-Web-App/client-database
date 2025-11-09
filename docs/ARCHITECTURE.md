@@ -32,15 +32,10 @@ simplicity.
 │                                                                 │
 │  ┌────────────────────────────────────────────────────────┐     │
 │  │  Kubernetes Jobs (Manual)                              │     │
-│  │  - Backup Job   - Restore Job                          │     │
-│  │  - Schema Load  - Migration Job                        │     │
+│  │  - Schema Load  - Migration Job  - Test Fixtures      │     │
 │  └────────────────────────────────────────────────────────┘     │
-│            │                                                    │
-│            │                                                    │
-│  ┌─────────▼──────────────┐                                     │
-│  │  Backup PVC            │                                     │
-│  │  (Backup storage)      │                                     │
-│  └────────────────────────┘                                     │
+│                                                                 │
+│  Note: Backup/Restore use direct kubectl exec (not Jobs)       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -111,24 +106,30 @@ simplicity.
 - ✅ Acceptable for internal service (not user-facing)
 - ✅ Can enable HA later with read replicas
 
-### 2. Job-Based Operations
+### 2. Operational Approaches
 
-**Decision**: Use Kubernetes Jobs for backup/restore/migrations
+**Decision**: Use different approaches for different operational tasks
 
-**Rationale:**
+**kubectl exec for Backup/Restore:**
 
-- **Cluster-native**: Operations run inside Kubernetes
-- **No external dependencies**: No need for external cron jobs or scripts
-- **Direct access**: Jobs access PVCs directly, no network overhead
+- **Simplicity**: Direct streaming with no Job/volume complexity
+- **Speed**: Immediate execution, no pod scheduling overhead
+- **Local storage**: Backups stream directly to local `db/data/backups/`
+- **Portability**: Works on any Kubernetes cluster
+- **Commands**:
+  - Backup: `kubectl exec ... mysqldump | gzip > local_file`
+  - Restore: `gunzip < local_file | kubectl exec -i ... mysql`
+
+**Kubernetes Jobs for Initialization:**
+
+- **Complex operations**: Schema loading, migrations, test fixtures
+- **Cluster-native**: Runs inside Kubernetes with proper RBAC
 - **Audit trail**: Kubernetes tracks Job history
-- **Manual control**: Triggered explicitly, not automated
-
-**Operations via Jobs:**
-
-- Backup: mysqldump to backup PVC
-- Restore: mysql import from backup PVC
-- Schema load: Execute db/init/schema/*.sql files
-- Migrations: Run golang-migrate
+- **Template substitution**: Uses envsubst for environment-specific SQL
+- **Operations**:
+  - Schema load: Execute db/init/schema/*.sql and db/init/users/*.sql files
+  - Migrations: Run golang-migrate with versioned migrations
+  - Test fixtures: Load sample data from db/fixtures/
 
 ### 3. Template-Based Configuration
 
@@ -147,28 +148,30 @@ simplicity.
 - `k8s/configmap-template.yaml` - MySQL configuration
 - `db/init/users/*-template.sql` - User creation scripts
 
-### 4. hostPath Backup Strategy
+### 4. Local Backup Storage
 
-**Decision**: Use hostPath volume to write backups directly to local repository
+**Decision**: Stream backups directly to local filesystem via kubectl exec
 
 **Rationale:**
 
-- **Simplicity**: No separate PVC for backups
+- **Simplicity**: No Jobs, no hostPath volumes, no complexity
+- **Immediate availability**: Backups written directly to `db/data/backups/`
+- **Portability**: Works on any Kubernetes cluster (not limited to single-node)
 - **Version control**: Backups stored in repo alongside code
 - **Cost**: Zero additional storage costs
-- **Direct access**: Backups immediately available on local filesystem
-- **Portability**: Easy to copy/move backups
+- **Performance**: Direct streaming, no intermediate storage needed
 
 **Storage:**
 
-1. **client-db-pvc**: Database files (/var/lib/mysql)
-2. **hostPath volume**: Backups written to `db/data/backups/` in repository
+1. **Database PVC**: Database files (/var/lib/mysql) - persistent across pod restarts
+2. **Local filesystem**: Backups in `db/data/backups/` - managed by backup script
 
 **Implementation:**
 
-- Backup/restore Jobs dynamically mount repository path via hostPath
-- Scripts pass absolute repo path to Job via environment variable
-- ConfigMap or Job spec updated before each backup/restore operation
+- Backup: `kubectl exec ... mysqldump | gzip > db/data/backups/backup_YYYY-MM-DD.sql.gz`
+- Restore: `gunzip < db/data/backups/backup_YYYY-MM-DD.sql.gz | kubectl exec -i ... mysql`
+- Automatic cleanup: Keep last 5 backups, delete older ones
+- User confirmation required for restore operations
 
 ### 5. Hierarchical Script Organization
 
@@ -380,62 +383,60 @@ db.SetConnMaxLifetime(5 * time.Minute)
 
 ### Backup Strategy
 
-**Method**: Kubernetes Job running mysqldump with hostPath volume
+**Method**: Direct kubectl exec streaming mysqldump to local filesystem
 
 **Process:**
 
 1. User triggers: `./scripts/dbManagement/backup-db.sh`
-2. Script detects absolute path to repository (`$PROJECT_ROOT`)
-3. Script creates Job from template with:
-   - Timestamp for backup filename
-   - Repository path as environment variable
-4. Job pod mounts:
-   - MySQL Service connection (network access to database)
-   - hostPath volume: `$PROJECT_ROOT/db/data/backups` → `/backups` in container
-5. Job executes: `mysqldump -h client-database -uroot -p$MYSQL_ROOT_PASSWORD --single-transaction client_db | gzip > /backups/clients-$(date).sql.gz`
-6. Job completes, backup stored in repository's `db/data/backups/`
+2. Script loads environment variables (database credentials)
+3. Script finds running MySQL pod via kubectl
+4. Script generates timestamped filename
+5. Script executes: `kubectl exec ... mysqldump | gzip > db/data/backups/client_db_backup_YYYY-MM-DD_HH-MM-SS.sql.gz`
+6. Backup streams directly from MySQL pod to local filesystem
+7. Script shows database statistics and backup size
+8. Script automatically cleans up old backups (keeps last 5)
 
 **Backup Storage:**
 
 - **Location**: Repository directory `db/data/backups/`
 - **Format**: Gzipped SQL dump
-- **Naming**: `clients-YYYYMMDD-HHMMSS.sql.gz`
-- **Retention**: Manual (gitignored, manage locally)
+- **Naming**: `client_db_backup_YYYY-MM-DD_HH-MM-SS.sql.gz`
+- **Retention**: Automatic (keeps last 5 backups, deletes older)
+- **Gitignored**: Backups not committed to version control
 
 **Advantages:**
 
-- No separate PVC needed (zero storage costs)
-- Backups immediately accessible on local filesystem
-- Can commit backups to version control if desired (though not recommended)
-- Simple to copy backups to external storage
-- Works on single-node and local Kubernetes clusters
+- **Simplicity**: No Jobs, no volumes, single command
+- **Speed**: Immediate execution, no pod scheduling delay
+- **Portability**: Works on any Kubernetes cluster
+- **Local access**: Backups immediately available on filesystem
+- **No extra storage**: Zero Kubernetes storage costs
+- **Easy migration**: Simple to copy backups elsewhere
 
 ### Restore Strategy
 
-**Method**: Kubernetes Job running mysql import with hostPath volume
+**Method**: Direct kubectl exec streaming from local filesystem to MySQL
 
 **Process:**
 
-1. User triggers: `./scripts/dbManagement/restore-db.sh <backup-file>`
-2. Script verifies backup file exists in `db/data/backups/`
-3. Script scales MySQL StatefulSet to 0 (graceful shutdown)
-4. Script creates restore Job with:
-   - Backup filename as environment variable
-   - Repository path for hostPath mount
-5. Job pod mounts:
-   - hostPath volume: `$PROJECT_ROOT/db/data/backups` → `/backups` in container (read-only)
-6. Job executes: `gunzip < /backups/<file> | mysql -h client-database -uroot -p$MYSQL_ROOT_PASSWORD client_db`
-7. Job completes
-8. Script scales MySQL StatefulSet to 1 (restart)
-9. Script verifies database health
+1. User triggers: `./scripts/dbManagement/restore-db.sh [backup-file]`
+2. Script auto-selects latest backup if no file specified
+3. Script verifies backup file exists in `db/data/backups/`
+4. Script shows database statistics (current state)
+5. **Script prompts user for confirmation** (destructive operation)
+6. Script executes: `gunzip < db/data/backups/backup.sql.gz | kubectl exec -i ... mysql`
+7. Backup streams directly from local filesystem into MySQL pod
+8. Script shows restored database statistics (new state)
+9. Script confirms successful restore
 
 **Safety Measures:**
 
-- Backup file existence verified locally before Job creation
-- MySQL scaled down before restore (prevents corruption)
-- Restore Job runs with retries on failure
-- Health check verification after restore
-- Original backup file preserved (read-only mount)
+- Backup file existence verified before restore
+- **User confirmation required** (prevents accidental data loss)
+- Database remains online during restore (no downtime)
+- Shows before/after statistics for verification
+- Original backup file preserved (unchanged)
+- Can restore specific backup or automatically use latest
 
 ## Monitoring & Observability
 

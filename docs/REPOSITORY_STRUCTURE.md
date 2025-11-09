@@ -41,11 +41,9 @@ client-database/
 │   │   ├── migrate.sh
 │   │   ├── restore-db.sh
 │   │   └── verify-health.sh
-│   ├── jobHelpers/                  # Scripts for Kubernetes jobs (4 files)
-│   │   ├── db-backup.sh
+│   ├── jobHelpers/                  # Scripts for Kubernetes jobs (2 files)
 │   │   ├── db-load-schema.sh
-│   │   ├── db-migrate.sh
-│   │   └── db-restore.sh
+│   │   └── db-load-test-fixtures.sh
 │   └── utils/                       # Shared utility functions
 │       └── common.sh
 ├── k8s/                             # Kubernetes manifests
@@ -55,11 +53,10 @@ client-database/
 │   ├── service.yaml                 # MySQL Service (port 3306)
 │   ├── pvc.yaml                     # Database storage PVC
 │   ├── README.md                    # K8s resource documentation
-│   └── jobs/                        # Kubernetes Job manifests (4 files)
-│       ├── db-backup-job.yaml       # Job with hostPath to db/data/backups/
-│       ├── db-load-schema-job.yaml
-│       ├── db-migrate-job.yaml
-│       └── db-restore-job.yaml      # Job with hostPath to db/data/backups/
+│   └── jobs/                        # Kubernetes Job manifests (3 files)
+│       ├── db-load-schema-job.yaml  # Loads initial schema and creates users
+│       ├── db-load-test-fixtures-job.yaml  # Loads test data
+│       └── db-migrate-job.yaml      # Runs golang-migrate for schema changes
 ├── migrations/                      # Schema migrations (golang-migrate)
 │   ├── 000001_initial_schema.up.sql
 │   ├── 000001_initial_schema.down.sql
@@ -159,10 +156,12 @@ All Kubernetes resource definitions for deploying MySQL.
 
 #### k8s/jobs/
 
-- Job templates for one-time operations
-- Backup and restore Jobs use hostPath volumes to mount `db/data/backups/` from repository
-- Schema loading and migration Jobs
-- Triggered manually via scripts, dynamically configured with repository path
+- Job templates for initialization operations
+- Schema loading Job: Executes SQL files from `db/init/schema/` and `db/init/users/`
+- Test fixtures Job: Loads sample data from `db/fixtures/`
+- Migration Job: Runs golang-migrate for schema changes
+- Triggered manually via dbManagement scripts
+- Note: Backup/restore use direct kubectl exec (not Jobs)
 
 ### `migrations/` - Schema Migrations
 
@@ -286,7 +285,7 @@ This structure mirrors recipe-database with these adaptations:
 - **No monitoring stack** - Can add prometheus-exporter later if needed
 - **Fewer fixtures** - Only sample OAuth2 clients
 - **golang-migrate** - Instead of custom migration scripts
-- **hostPath backups** - Backups stored in repository using hostPath volumes, not separate PVC
+- **Direct kubectl exec backups** - Backups stream to local filesystem, no Jobs/volumes needed
 
-The core organizational principles remain the same: hierarchical scripts, numbered schema files, Job-based operations,
+The core organizational principles remain the same: hierarchical scripts, numbered schema files, Job-based initialization,
 and comprehensive documentation.

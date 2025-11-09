@@ -13,8 +13,9 @@ auth-service.
 - **MySQL 8.0** with InnoDB for ACID compliance and performance
 - **Kubernetes-native** deployment using StatefulSets
 - **Read-optimized** for fast credential lookups
-- **Job-based operations** for backups, restores, and migrations
-- **hostPath backups** stored directly in repository
+- **Direct kubectl exec operations** for backup/restore (simple streaming approach)
+- **Job-based operations** for schema initialization and migrations
+- **Local backups** stored in repository (`db/data/backups/`)
 - **Schema migrations** using golang-migrate
 - **Security-focused** with bcrypt hashing and encryption at rest
 
@@ -216,7 +217,7 @@ Comprehensive documentation is available in the `docs/` directory:
 - **Platform**: Kubernetes
 - **Storage**: PersistentVolumeClaim (ReadWriteOnce)
 - **Migrations**: golang-migrate
-- **Backup**: mysqldump with hostPath volumes
+- **Backup/Restore**: mysqldump via kubectl exec (streams to/from local filesystem)
 - **Scripting**: Bash
 
 ## Security

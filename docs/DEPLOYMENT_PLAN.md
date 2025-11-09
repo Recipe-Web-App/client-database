@@ -304,21 +304,18 @@ Create first backup:
 
 ```bash
 ./scripts/dbManagement/backup-db.sh
-```bash
+```
 
 This script will:
 
-1. Detect the absolute path to your repository
-2. Create a Kubernetes Job with hostPath mount to `db/data/backups/`
-3. Run mysqldump inside the Job pod
-4. Save backup to `db/data/backups/clients-<timestamp>.sql.gz`
+1. Load environment variables from `.env`
+2. Find the running MySQL pod
+3. Execute `kubectl exec ... mysqldump` and stream output
+4. Compress and save to `db/data/backups/client_db_backup_<timestamp>.sql.gz`
+5. Show database statistics and backup size
+6. Automatically clean up old backups (keeps last 5)
 
-Monitor:
-
-```bash
-kubectl get jobs -n $NAMESPACE
-kubectl logs -f job/db-backup-<timestamp> -n $NAMESPACE
-```bash
+The backup executes immediately with no Job scheduling delay.
 
 #### 5.2 Verify Backup
 
@@ -326,26 +323,30 @@ List backups in your local repository:
 
 ```bash
 ls -lh db/data/backups/
-```bash
+```
 
 Expected output:
 
-```bash
--rw-r--r-- 1 user user 1.2K Jan  6 12:00 clients-20250106-120000.sql.gz
-```bash
+```text
+-rw-r--r-- 1 user user 1.2K Jan  6 12:00 client_db_backup_2025-01-06_12-00-00.sql.gz
+```
 
 The backup is now stored locally in your repository and can be:
 
-- Committed to version control (not recommended for production data)
 - Copied to external storage (S3, network drive, etc.)
 - Used for restore operations
+- Kept in version control (not recommended for production data)
 
 #### 5.3 Test Restore (Optional)
 
 In non-production environment, test restore procedure:
 
 ```bash
-./scripts/dbManagement/restore-db.sh clients-20250106-120000.sql.gz
+# Restore specific backup
+./scripts/dbManagement/restore-db.sh client_db_backup_2025-01-06_12-00-00.sql.gz
+
+# Or restore latest backup automatically
+./scripts/dbManagement/restore-db.sh
 ```bash
 
 **Warning**: This stops the database and restores data. Only run in test environments.
@@ -698,24 +699,30 @@ kubectl get secret client-database-secrets -n $NAMESPACE -o yaml
 - MySQL user not created
 - Network policy blocking traffic
 
-### Issue: Backup Job fails
+### Issue: Backup fails
 
-**Symptoms**: Job status shows `Failed`
+**Symptoms**: Backup script exits with error
 
 **Diagnosis**:
 
 ```bash
-kubectl logs job/db-backup-<timestamp> -n $NAMESPACE
-kubectl describe job/db-backup-<timestamp> -n $NAMESPACE
-```bash
+# Check if MySQL pod is running
+kubectl get pods -n $NAMESPACE -l app=client-database,component=mysql
+
+# Check kubectl connectivity
+kubectl exec -n $NAMESPACE client-database-mysql-0 -- mysql --version
+
+# Verify credentials in .env
+cat .env | grep DB_MAINT
+```
 
 **Common Causes**:
 
-- hostPath not accessible (check node has access to repository path)
+- MySQL pod not running (check pod status)
 - Insufficient disk space on local filesystem
-- MySQL not accessible from Job pod (check Service connectivity)
-- Wrong credentials in Secret
-- Repository path incorrect (must be absolute path)
+- Wrong credentials in `.env` file
+- kubectl cannot access cluster
+- Network connectivity issues
 
 ### Issue: Slow queries
 

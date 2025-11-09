@@ -235,7 +235,7 @@ docker run --rm client-database-jobs:latest migrate -version
 docker run --rm client-database-jobs:latest ls -la /app/sql/init/schema/
 
 # Check scripts
-docker run --rm client-database-jobs:latest cat /app/scripts/jobHelpers/db-backup.sh
+docker run --rm client-database-jobs:latest cat /app/scripts/jobHelpers/db-load-schema.sh
 ```
 
 #### Test with environment variables
@@ -530,11 +530,11 @@ spec:
   template:
     spec:
       containers:
-      - name: backup-job
+      - name: schema-load-job
         image: client-database-jobs:latest
         imagePullPolicy: IfNotPresent
         command: ["/bin/bash"]
-        args: ["/app/scripts/jobHelpers/db-backup.sh"]
+        args: ["/app/scripts/jobHelpers/db-load-schema.sh"]
         env:
         - name: MYSQL_HOST
           value: client-database
@@ -553,7 +553,7 @@ If pushing to a registry:
 ```yaml
 spec:
   containers:
-  - name: backup-job
+  - name: schema-load-job
     image: your-registry.io/client-database-jobs:v1.0.0
     imagePullPolicy: Always
   imagePullSecrets:

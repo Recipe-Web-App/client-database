@@ -24,7 +24,7 @@ When implementing remaining directories, follow the patterns documented in `docs
 - **Container Images**: Custom Docker images for MySQL server and Jobs
 - **Configuration**: envsubst for template-based Kubernetes manifests
 - **Migrations**: golang-migrate
-- **Backup/Restore**: mysqldump with Kubernetes Jobs
+- **Backup/Restore**: mysqldump via kubectl exec (direct streaming to/from local filesystem)
 - **Scripting**: Bash
 - **Security**: bcrypt password hashing (cost factor 10)
 
@@ -43,8 +43,8 @@ We use **two custom-built Docker images** for complete control over the MySQL en
 
 **Jobs Image** (`client-database-jobs:latest`):
 - Base: Debian Bookworm Slim
-- Includes: MySQL client, mysqldump, golang-migrate, envsubst, bash
-- Used by: All Kubernetes Jobs (`k8s/jobs/*.yaml`)
+- Includes: MySQL client, golang-migrate, envsubst, bash
+- Used by: Kubernetes Jobs for migrations, schema loading, test fixtures
 - Dockerfile: `tools/Dockerfile.jobs`
 - Build: `make docker-build-jobs`
 
@@ -61,18 +61,18 @@ All operations are Kubernetes-native:
 - **StatefulSet** for MySQL (single replica initially, can scale to read replicas)
 - **ClusterIP Service** for internal-only access (port 3306)
 - **PersistentVolumeClaim** for database storage (10Gi)
-- **Jobs** for operational tasks (backup, restore, schema loading, migrations)
+- **Jobs** for initialization tasks (schema loading, migrations, test fixtures)
 
-### 3. hostPath Backup Strategy (Non-Standard Pattern)
+### 3. Direct kubectl exec for Backup/Restore
 
-Unlike typical Kubernetes patterns, backups are stored **directly in the repository** at `db/data/backups/`:
+Backup and restore operations use **direct kubectl exec** commands instead of Kubernetes Jobs:
 
-- Kubernetes Jobs mount repository path via hostPath volumes
-- No separate backup PVC needed
-- Enables local backup access and version control of backups
-- **Trade-off**: Works best on single-node or local clusters
-
-This is configured dynamically with the repository's absolute path when deploying Jobs.
+- Backup: `kubectl exec ... mysqldump | gzip > local_file`
+- Restore: `gunzip < local_file | kubectl exec -i ... mysql`
+- Backups stored locally in repository at `db/data/backups/`
+- No hostPath volumes or Job complexity needed
+- Simpler, more maintainable approach
+- Works on any Kubernetes cluster (not limited to single-node setups)
 
 ### 4. Template-Based Configuration
 
@@ -106,16 +106,17 @@ Table: `oauth2_clients`
 - Audit fields: `created_at`, `updated_at`, `created_by`
 - `metadata` (JSON, nullable) - Extensible metadata
 
-### 6. Job-Based Operations
+### 6. Script Execution Context
 
-Operational tasks run as Kubernetes Jobs, not directly on the pod:
+When working with operational scripts, note the execution context:
 
-- Backup: Job mounts hostPath, runs mysqldump, saves to `db/data/backups/`
-- Restore: Job reads from hostPath, restores to MySQL
-- Migrations: Job runs golang-migrate with migration files
-- Schema loading: Job executes numbered SQL files from `db/init/schema/`
+- `scripts/containerManagement/*` - Run on **local machine** (uses kubectl)
+- `scripts/dbManagement/*` - Run on **local machine** (direct kubectl exec or creates Kubernetes Jobs)
+- `scripts/jobHelpers/*` - Run **inside Kubernetes Job pods** (direct MySQL access)
 
-This pattern enables clean separation of operational and runtime workloads.
+**Operational approaches:**
+- **Direct kubectl exec**: Simple operations (backup, restore, db-connect, export-schema, verify-health)
+- **Kubernetes Jobs**: Complex initialization operations (load-schema, load-test-fixtures, migrations)
 
 ## Essential Development Commands
 
