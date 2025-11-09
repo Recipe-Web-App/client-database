@@ -1,23 +1,23 @@
-# Kubernetes Job for Database Backup
-# Creates timestamped MySQL backup and saves to repository's db/data/backups/ directory
-# Note: Job name and hostPath volume are set dynamically by deployment script
+# Kubernetes Job for Loading Test Fixtures
+# Loads test data from SQL fixture files
+# Executes SQL files from /app/sql/fixtures/ in the Jobs image
 
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: client-database-backup
+  name: client-database-load-test-fixtures
   namespace: client-database
   labels:
     app: client-database
-    component: backup
+    component: test-fixtures
 spec:
-  ttlSecondsAfterFinished: 3600 # Clean up after 1 hour
+  ttlSecondsAfterFinished: 3600
   backoffLimit: 3
   template:
     metadata:
       labels:
         app: client-database
-        component: backup
+        component: test-fixtures
     spec:
       restartPolicy: OnFailure
       automountServiceAccountToken: false
@@ -29,7 +29,7 @@ spec:
         runAsGroup: 10001
 
       containers:
-        - name: mysql-backup
+        - name: load-test-fixtures
           image: client-database-jobs:latest
           imagePullPolicy: IfNotPresent
 
@@ -44,14 +44,14 @@ spec:
             requests:
               cpu: 250m
               memory: 256Mi
-              ephemeral-storage: 1Gi
+              ephemeral-storage: 256Mi
             limits:
               cpu: 500m
               memory: 512Mi
-              ephemeral-storage: 2Gi
+              ephemeral-storage: 512Mi
 
           command: ["/bin/bash"]
-          args: ["/app/scripts/jobHelpers/db-backup.sh"]
+          args: ["/app/scripts/jobHelpers/db-load-test-fixtures.sh"]
 
           env:
             # Connection info from ConfigMap
@@ -70,7 +70,7 @@ spec:
                 configMapKeyRef:
                   name: client-database-config
                   key: MYSQL_DATABASE
-            # Credentials from Secret (use root for backups)
+            # Credentials from Secret (use root for loading fixtures)
             - name: MYSQL_USER
               value: root
             - name: MYSQL_PASSWORD
@@ -80,8 +80,6 @@ spec:
                   key: MYSQL_ROOT_PASSWORD
 
           volumeMounts:
-            - name: backup-storage
-              mountPath: /backups
             - name: mysql-config
               mountPath: /etc/mysql/conf.d
               readOnly: true
@@ -89,12 +87,6 @@ spec:
               mountPath: /tmp
 
       volumes:
-        # hostPath volume for backups
-        # Note: Path will be set by deployment script to repository's db/data/backups/
-        - name: backup-storage
-          hostPath:
-            path: /path/to/repo/db/data/backups
-            type: DirectoryOrCreate
         # MySQL configuration from ConfigMap
         - name: mysql-config
           configMap:

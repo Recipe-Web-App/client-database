@@ -38,6 +38,7 @@ repos:
         name: Lint and fix SQL files
         args: [--dialect, mysql, --exclude-rules, "RF04,RF05"]
         files: \.sql$
+        exclude: -template\.sql$
 
   # Shell script linting
   - repo: https://github.com/shellcheck-py/shellcheck-py

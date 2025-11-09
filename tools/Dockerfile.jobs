@@ -87,10 +87,9 @@ COPY --chown=jobuser:jobuser db/init/schema/*.sql /app/sql/init/schema/
 COPY --chown=jobuser:jobuser db/init/users/*.sql /app/sql/init/users/
 COPY --chown=jobuser:jobuser db/fixtures/*.sql /app/sql/fixtures/
 
-# Copy job helper scripts (if they exist)
-# Note: scripts/jobHelpers/ will be added in future commits
-# COPY --chown=jobuser:jobuser scripts/jobHelpers/*.sh /app/scripts/jobHelpers/
-# RUN chmod +x /app/scripts/jobHelpers/*.sh
+# Copy job helper scripts
+COPY --chown=jobuser:jobuser scripts/jobHelpers/*.sh /app/scripts/jobHelpers/
+RUN chmod +x /app/scripts/jobHelpers/*.sh
 
 # Set working directory
 WORKDIR /app

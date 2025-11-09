@@ -58,9 +58,12 @@ backup:  ## Create database backup
 	./scripts/dbManagement/backup-db.sh
 
 .PHONY: restore
-restore:  ## Restore database from backup (usage: make restore BACKUP_FILE=clients-20250106.sql.gz)
-	@test -n "$(BACKUP_FILE)" || (echo "Error: BACKUP_FILE not specified. Usage: make restore BACKUP_FILE=clients-20250106.sql.gz" && exit 1)
-	./scripts/dbManagement/restore-db.sh $(BACKUP_FILE)
+restore:  ## Restore database from backup (usage: make restore [BACKUP_FILE=clients-20250106.sql.gz])
+	@if [ -n "$(BACKUP_FILE)" ]; then \
+		./scripts/dbManagement/restore-db.sh $(BACKUP_FILE); \
+	else \
+		./scripts/dbManagement/restore-db.sh; \
+	fi
 
 .PHONY: connect
 connect:  ## Connect to MySQL shell
