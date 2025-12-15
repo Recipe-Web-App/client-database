@@ -157,11 +157,14 @@ kubectl apply -f "${CONFIG_DIR}/pvc.yaml"
 print_status "ok" "PVC created/updated."
 
 print_separator "="
-echo -e "${CYAN}🌐 Creating Service (before StatefulSet for DNS)...${NC}"
+echo -e "${CYAN}🌐 Creating Services (before StatefulSet for DNS)...${NC}"
 print_separator "-"
 
 kubectl apply -f "${CONFIG_DIR}/service.yaml"
-print_status "ok" "Service created/updated."
+print_status "ok" "Headless service created/updated."
+
+envsubst <"${CONFIG_DIR}/service-nodeport-template.yaml" | kubectl apply -f -
+print_status "ok" "NodePort service created/updated."
 
 print_separator "="
 echo -e "${CYAN}📦 Deploying MySQL StatefulSet...${NC}"
@@ -186,15 +189,35 @@ SERVICE_JSON=$(kubectl get svc "$SERVICE_NAME" -n "$NAMESPACE" -o json)
 SERVICE_IP=$(echo "$SERVICE_JSON" | jq -r '.spec.clusterIP')
 SERVICE_PORT=$(echo "$SERVICE_JSON" | jq -r '.spec.ports[0].port')
 
+NODEPORT_SERVICE_JSON=$(kubectl get svc "${SERVICE_NAME}-external" -n "$NAMESPACE" -o json 2>/dev/null || echo "{}")
+NODEPORT=$(echo "$NODEPORT_SERVICE_JSON" | jq -r '.spec.ports[0].nodePort // empty')
+MINIKUBE_IP=$(minikube ip 2>/dev/null || echo "N/A")
+
+LOCAL_HOSTNAME="client-database.local"
+if [ "$MINIKUBE_IP" != "N/A" ]; then
+  echo -e "${CYAN}📝 Updating /etc/hosts...${NC}"
+  # Remove any existing entry for the hostname
+  sed -i "/$LOCAL_HOSTNAME/d" /etc/hosts
+  # Add new entry
+  echo "$MINIKUBE_IP $LOCAL_HOSTNAME" >>/etc/hosts
+  print_status "ok" "Added $LOCAL_HOSTNAME -> $MINIKUBE_IP to /etc/hosts"
+fi
+
 echo -e "${CYAN}🛰️  Access info:${NC}"
 echo "  Pod: $POD_NAME"
-echo "  Service: $SERVICE_NAME (headless)"
+echo "  Headless Service: $SERVICE_NAME"
 echo "  ClusterIP: $SERVICE_IP"
 echo "  Port: $SERVICE_PORT"
 echo "  DNS: $SERVICE_NAME.$NAMESPACE.svc.cluster.local"
 echo ""
-echo -e "${YELLOW}ℹ️  This is a cluster-internal service (no external access)${NC}"
-echo "  Access from other pods: mysql -h $SERVICE_NAME.$NAMESPACE.svc.cluster.local -u <user> -p"
+echo -e "${CYAN}🌐 External access (NodePort):${NC}"
+echo "  Service: ${SERVICE_NAME}-external"
+echo "  NodePort: $NODEPORT"
+echo "  Minikube IP: $MINIKUBE_IP"
+echo "  Hostname: $LOCAL_HOSTNAME"
+if [ -n "$NODEPORT" ] && [ "$MINIKUBE_IP" != "N/A" ]; then
+  echo -e "  ${GREEN}Connect: mysql -h $LOCAL_HOSTNAME -P $NODEPORT -u <user> -p${NC}"
+fi
 echo ""
 echo -e "${YELLOW}💡 Next steps:${NC}"
 echo "  1. Run: make load-schema    # Initialize database schema"
