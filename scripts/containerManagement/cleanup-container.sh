@@ -67,9 +67,10 @@ kubectl delete statefulset "$STATEFULSET_NAME" -n "$NAMESPACE" --ignore-not-foun
 print_status "ok" "StatefulSet deletion completed"
 
 print_separator
-echo -e "${CYAN}🌐 Deleting service...${NC}"
+echo -e "${CYAN}🌐 Deleting services...${NC}"
 kubectl delete service "$SERVICE_NAME" -n "$NAMESPACE" --ignore-not-found
-print_status "ok" "Service deletion completed"
+kubectl delete service "${SERVICE_NAME}-external" -n "$NAMESPACE" --ignore-not-found
+print_status "ok" "Services deletion completed"
 
 print_separator
 echo -e "${CYAN}⚙️  Deleting configmap...${NC}"
@@ -128,6 +129,16 @@ if docker images -q "$JOBS_FULL_IMAGE" >/dev/null 2>&1; then
   print_status "ok" "Jobs image '$JOBS_FULL_IMAGE' removed"
 else
   print_status "ok" "Jobs image '$JOBS_FULL_IMAGE' was not found"
+fi
+
+print_separator
+echo -e "${CYAN}📝 Cleaning up /etc/hosts...${NC}"
+LOCAL_HOSTNAME="client-database.local"
+if grep -q "$LOCAL_HOSTNAME" /etc/hosts; then
+  sed -i "/$LOCAL_HOSTNAME/d" /etc/hosts
+  print_status "ok" "Removed $LOCAL_HOSTNAME from /etc/hosts"
+else
+  print_status "ok" "No $LOCAL_HOSTNAME entry found in /etc/hosts"
 fi
 
 print_separator "="
