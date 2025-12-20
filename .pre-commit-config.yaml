@@ -32,7 +32,7 @@ repos:
 
   # SQL linting and formatting
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 4.0.0a1
+    rev: 4.0.0a2
     hooks:
       - id: sqlfluff-fix
         name: Lint and fix SQL files
@@ -60,7 +60,7 @@ repos:
 
   # Kubernetes manifest validation and linting
   - repo: https://github.com/stackrox/kube-linter
-    rev: v0.7.6
+    rev: v0.8.2
     hooks:
       - id: kube-linter
         name: Lint Kubernetes manifests
@@ -90,7 +90,7 @@ repos:
 
   # Secret scanning
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.29.0
+    rev: v8.30.0
     hooks:
       - id: gitleaks
         name: Scan for secrets
@@ -109,13 +109,13 @@ repos:
     rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
-        name: Format YAML files
-        types: [yaml]
+        name: Format JSON, Markdown, and YAML files
+        types: [json, markdown, yaml]
         args: [--write, --prose-wrap, always, --print-width, "120"]
 
   # Markdown linting
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.45.0
+    rev: v0.47.0
     hooks:
       - id: markdownlint
         name: Lint Markdown files

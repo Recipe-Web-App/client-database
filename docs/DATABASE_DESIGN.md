@@ -453,17 +453,17 @@ ORDER BY updated_at DESC;
 
 ## Design Rationale Summary
 
-| Decision | Rationale |
-|----------|-----------|
-| **MySQL 8.0** | Fast reads, network connections, mature ecosystem |
-| **InnoDB** | ACID compliance, row-level locking, encryption support |
-| **JSON fields** | Flexible storage for arrays without join tables |
-| **bcrypt hashing** | Industry standard for password/secret storage |
-| **uuid4 character set** | Full Unicode support for international clients |
-| **Two indexes** | Balance between query performance and write overhead |
-| **Soft deletes** | `is_active` field preserves audit history |
-| **Auto timestamps** | Automatic `created_at` and `updated_at` tracking |
-| **Metadata JSON** | Future extensibility without schema changes |
+| Decision                | Rationale                                              |
+|-------------------------|--------------------------------------------------------|
+| **MySQL 8.0**           | Fast reads, network connections, mature ecosystem      |
+| **InnoDB**              | ACID compliance, row-level locking, encryption support |
+| **JSON fields**         | Flexible storage for arrays without join tables        |
+| **bcrypt hashing**      | Industry standard for password/secret storage          |
+| **uuid4 character set** | Full Unicode support for international clients         |
+| **Two indexes**         | Balance between query performance and write overhead   |
+| **Soft deletes**        | `is_active` field preserves audit history              |
+| **Auto timestamps**     | Automatic `created_at` and `updated_at` tracking       |
+| **Metadata JSON**       | Future extensibility without schema changes            |
 
 ## Entity Relationship Diagram
 
