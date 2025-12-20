@@ -382,14 +382,14 @@ make docker-clean-all
 
 ### Installed Tools
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| mysql client | 8.0+ | Database operations |
-| mysqldump | 8.0+ | Backup operations |
-| golang-migrate | 4.17.0 | Schema migrations |
-| envsubst | 0.21+ | Template substitution |
-| bash | 5.2+ | Script execution |
-| gzip | 1.12+ | Compression/decompression |
+| Tool           | Version | Purpose                   |
+|----------------|---------|---------------------------|
+| mysql client   | 8.0+    | Database operations       |
+| mysqldump      | 8.0+    | Backup operations         |
+| golang-migrate | 4.17.0  | Schema migrations         |
+| envsubst       | 0.21+   | Template substitution     |
+| bash           | 5.2+    | Script execution          |
+| gzip           | 1.12+   | Compression/decompression |
 
 ### Environment Variables
 

@@ -32,10 +32,10 @@ simplicity.
 │                                                                 │
 │  ┌────────────────────────────────────────────────────────┐     │
 │  │  Kubernetes Jobs (Manual)                              │     │
-│  │  - Schema Load  - Migration Job  - Test Fixtures      │     │
+│  │  - Schema Load  - Migration Job  - Test Fixtures       │     │
 │  └────────────────────────────────────────────────────────┘     │
 │                                                                 │
-│  Note: Backup/Restore use direct kubectl exec (not Jobs)       │
+│  Note: Backup/Restore use direct kubectl exec (not Jobs)        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -626,15 +626,15 @@ readinessProbe:
 
 ## Technology Comparison Matrix
 
-| Feature | MySQL | PostgreSQL | SQLite |
-|---------|-------|------------|--------|
-| Read performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Network support | ✅ | ✅ | ❌ |
-| Multi-reader | ✅ | ✅ | ⚠️ (WAL limits) |
-| Memory usage | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Operational complexity | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Kubernetes support | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ |
-| Backup/restore | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Feature                | MySQL      | PostgreSQL | SQLite          |
+|------------------------|------------|------------|-----------------|
+| Read performance       | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐      |
+| Network support        | ✅         | ✅         | ❌              |
+| Multi-reader           | ✅         | ✅         | ⚠️ (WAL limits) |
+| Memory usage           | ⭐⭐⭐⭐⭐ | ⭐⭐⭐     | ⭐⭐⭐⭐⭐      |
+| Operational complexity | ⭐⭐⭐     | ⭐⭐⭐     | ⭐⭐⭐⭐⭐      |
+| Kubernetes support     | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐            |
+| Backup/restore         | ⭐⭐⭐⭐   | ⭐⭐⭐⭐   | ⭐⭐⭐⭐⭐      |
 
 **Legend**: ⭐⭐⭐⭐⭐ Excellent, ⭐⭐⭐⭐ Very Good, ⭐⭐⭐ Good, ⭐⭐ Fair, ❌ Not Supported
 
