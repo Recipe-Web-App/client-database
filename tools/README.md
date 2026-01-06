@@ -366,17 +366,14 @@ make docker-clean-all
 │   │   │   ├── 002_create_oauth2_clients_table.sql
 │   │   │   └── 003_create_indexes.sql
 │   │   └── users/
-│   │       ├── 001_create_users.sql
-│   │       └── 002_grant_permissions.sql
+│   │       ├── 001_create_maint_user-template.sql
+│   │       └── 002_create_auth_service_user-template.sql
 │   └── fixtures/
 │       └── 001_sample_clients.sql
 ├── scripts/
 │   └── jobHelpers/
-│       ├── db-backup.sh
-│       ├── db-restore.sh
 │       ├── db-load-schema.sh
-│       └── db-migrate.sh
-/backups/          # Mount point for backup hostPath volume
+│       └── db-load-test-fixtures.sh
 /tmp/              # Temporary files
 ```
 
@@ -386,7 +383,6 @@ make docker-clean-all
 |----------------|---------|---------------------------|
 | mysql client   | 8.0+    | Database operations       |
 | mysqldump      | 8.0+    | Backup operations         |
-| golang-migrate | 4.17.0  | Schema migrations         |
 | envsubst       | 0.21+   | Template substitution     |
 | bash           | 5.2+    | Script execution          |
 | gzip           | 1.12+   | Compression/decompression |

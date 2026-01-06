@@ -14,9 +14,8 @@ auth-service.
 - **Kubernetes-native** deployment using StatefulSets
 - **Read-optimized** for fast credential lookups
 - **Direct kubectl exec operations** for backup/restore (simple streaming approach)
-- **Job-based operations** for schema initialization and migrations
+- **Job-based operations** for schema initialization
 - **Local backups** stored in repository (`db/data/backups/`)
-- **Schema migrations** using golang-migrate
 - **Security-focused** with bcrypt hashing and encryption at rest
 
 ## Quick Start
@@ -86,7 +85,6 @@ client-database/
 ├── db/                  # Database schema, fixtures, queries
 ├── docs/                # Comprehensive documentation
 ├── k8s/                 # Kubernetes manifests
-├── migrations/          # Schema migrations
 ├── scripts/             # Operational scripts
 │   ├── containerManagement/
 │   ├── dbManagement/
@@ -152,12 +150,6 @@ Backups are stored in `db/data/backups/` with timestamp naming.
 ./scripts/dbManagement/db-connect.sh
 ```
 
-**Run Migrations:**
-
-```bash
-./scripts/dbManagement/migrate.sh
-```
-
 **Check Status:**
 
 ```bash
@@ -216,7 +208,6 @@ Comprehensive documentation is available in the `docs/` directory:
 - **Database**: MySQL 8.0
 - **Platform**: Kubernetes
 - **Storage**: PersistentVolumeClaim (ReadWriteOnce)
-- **Migrations**: golang-migrate
 - **Backup/Restore**: mysqldump via kubectl exec (streams to/from local filesystem)
 - **Scripting**: Bash
 
@@ -259,7 +250,6 @@ make status    # Check deployment status
 make backup    # Create database backup
 make restore   # Restore from backup
 make connect   # Connect to MySQL shell
-make migrate   # Run schema migrations
 ```
 
 ## Contributing

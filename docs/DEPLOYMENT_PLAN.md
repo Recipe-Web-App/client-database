@@ -56,7 +56,7 @@ Copy the example environment file:
 
 ```bash
 cp .env.example .env
-```bash
+```
 
 Edit `.env` with your specific values:
 
@@ -66,25 +66,24 @@ MYSQL_HOST=client-database
 MYSQL_PORT=3306
 MYSQL_DATABASE=client_db
 MYSQL_ROOT_PASSWORD=<generate-strong-password>
-MYSQL_USER=client_db_user
-MYSQL_PASSWORD=<generate-strong-password>
-MYSQL_BACKUP_USER=backup_user
-MYSQL_BACKUP_PASSWORD=<generate-strong-password>
 
-# Kubernetes
-NAMESPACE=client-database
-STATEFULSET_NAME=client-database-mysql
-SERVICE_NAME=client-database
+# Database Maintenance User
+DB_MAINT_USERNAME=db-maint-user
+DB_MAINT_PASSWORD=<generate-strong-password>
+
+# Auth Service Application User
+AUTH_SERVICE_USERNAME=auth-service-user
+AUTH_SERVICE_PASSWORD=<generate-strong-password>
 
 # Backup
 BACKUP_RETENTION_DAYS=30
-```bash
+```
 
 **Security Note**: Generate strong passwords using:
 
 ```bash
 openssl rand -base64 32
-```bash
+```
 
 #### 1.2 Verify Tools
 
@@ -92,8 +91,7 @@ openssl rand -base64 32
 kubectl version --client
 envsubst --version
 mysql --version  # optional
-golang-migrate -version  # optional
-```bash
+```
 
 ### Phase 2: Kubernetes Resource Deployment
 
@@ -102,7 +100,7 @@ golang-migrate -version  # optional
 ```bash
 kubectl create namespace client-database
 # Update .env with NAMESPACE=client-database
-```bash
+```
 
 #### 2.2 Deploy Secrets
 
@@ -110,13 +108,13 @@ Generate and apply Kubernetes Secret:
 
 ```bash
 envsubst < k8s/secret-template.yaml | kubectl apply -f -
-```bash
+```
 
 Verify:
 
 ```bash
 kubectl get secrets client-database-secrets -n $NAMESPACE
-```bash
+```
 
 #### 2.3 Deploy ConfigMap
 
@@ -124,14 +122,14 @@ Generate and apply MySQL configuration:
 
 ```bash
 envsubst < k8s/configmap-template.yaml | kubectl apply -f -
-```bash
+```
 
 Verify:
 
 ```bash
 kubectl get configmap client-database-config -n $NAMESPACE
 kubectl describe configmap client-database-config -n $NAMESPACE
-```bash
+```
 
 #### 2.4 Create Persistent Volume Claim
 
@@ -139,13 +137,13 @@ Apply PVC for database storage:
 
 ```bash
 kubectl apply -f k8s/pvc.yaml
-```bash
+```
 
 Verify:
 
 ```bash
 kubectl get pvc -n $NAMESPACE
-```bash
+```
 
 Wait for PVC to be bound:
 
@@ -162,20 +160,20 @@ Apply the StatefulSet:
 
 ```bash
 kubectl apply -f k8s/statefulset.yaml
-```bash
+```
 
 Wait for pod to be ready:
 
 ```bash
 kubectl wait --for=condition=ready pod -l app=client-database -n $NAMESPACE --timeout=300s
-```bash
+```
 
 Check status:
 
 ```bash
 kubectl get statefulset client-database-mysql -n $NAMESPACE
 kubectl get pods -l app=client-database -n $NAMESPACE
-```bash
+```
 
 #### 2.6 Deploy MySQL Service
 
@@ -183,14 +181,14 @@ Apply the Service:
 
 ```bash
 kubectl apply -f k8s/service.yaml
-```bash
+```
 
 Verify:
 
 ```bash
 kubectl get svc client-database -n $NAMESPACE
 kubectl describe svc client-database -n $NAMESPACE
-```bash
+```
 
 ### Phase 3: Database Initialization
 
@@ -200,7 +198,7 @@ Execute schema initialization Job:
 
 ```bash
 ./scripts/dbManagement/load-schema.sh
-```bash
+```
 
 This Job will:
 
@@ -213,20 +211,14 @@ Monitor Job:
 ```bash
 kubectl get jobs -n $NAMESPACE
 kubectl logs -f job/db-load-schema-<timestamp> -n $NAMESPACE
-```bash
+```
 
 #### 3.2 Create Database Users
 
-Execute user creation Job:
+The schema loading Job also creates the database users:
 
-```bash
-kubectl create job --from=cronjob/create-users create-users-$(date +%s) -n $NAMESPACE
-```bash
-
-This creates:
-
-- `client_db_user` - Application user (SELECT, INSERT, UPDATE)
-- `backup_user` - Backup user (SELECT, LOCK TABLES)
+- `db-maint-user` - Maintenance user for schema changes
+- `auth-service-user` - Application user (SELECT, INSERT, UPDATE)
 
 #### 3.3 Load Test Fixtures (Optional)
 
@@ -234,7 +226,7 @@ For development/testing environments:
 
 ```bash
 ./scripts/dbManagement/load-test-fixtures.sh
-```bash
+```
 
 This loads sample OAuth2 clients from `db/fixtures/001_sample_clients.sql`.
 
@@ -244,15 +236,15 @@ Run health check:
 
 ```bash
 ./scripts/dbManagement/verify-health.sh
-```bash
+```
 
 Expected output:
 
-```bash
+```text
 total_clients | active_clients | inactive_clients | checked_at          | status
 -------------+----------------+------------------+---------------------+--------
 3            | 2              | 1                | 2025-01-06 12:00:00 | healthy
-```bash
+```
 
 ### Phase 4: Auth-Service Integration
 
@@ -278,7 +270,7 @@ env:
     secretKeyRef:
       name: client-database-secrets
       key: MYSQL_PASSWORD
-```bash
+```
 
 #### 4.2 Test Connection
 
@@ -286,15 +278,15 @@ From auth-service pod:
 
 ```bash
 kubectl exec -it <auth-service-pod> -n <namespace> -- sh
-mysql -h client-database -u client_db_user -p client_db
+mysql -h client-database -u auth-service-user -p client_db
 # Enter password when prompted
-```bash
+```
 
 Test query:
 
 ```sql
 SELECT COUNT(*) FROM oauth2_clients WHERE is_active = TRUE;
-```bash
+```
 
 ### Phase 5: Backup Configuration
 
@@ -347,7 +339,7 @@ In non-production environment, test restore procedure:
 
 # Or restore latest backup automatically
 ./scripts/dbManagement/restore-db.sh
-```bash
+```
 
 **Warning**: This stops the database and restores data. Only run in test environments.
 
@@ -357,7 +349,7 @@ Use the all-in-one deployment script:
 
 ```bash
 ./scripts/containerManagement/deploy-container.sh
-```bash
+```
 
 This script automates:
 
@@ -377,7 +369,7 @@ This script automates:
 
 ```bash
 ./scripts/containerManagement/get-container-status.sh
-```bash
+```
 
 Output includes:
 
@@ -391,7 +383,7 @@ Output includes:
 
 ```bash
 ./scripts/dbManagement/db-connect.sh
-```bash
+```
 
 Drops you into a MySQL shell connected to the database.
 
@@ -401,34 +393,34 @@ Drops you into a MySQL shell connected to the database.
 
 ```bash
 ./scripts/dbManagement/backup-db.sh
-```bash
+```
 
-Backups are stored in `/backups` on the backup PVC with naming:
+Backups are stored in `db/data/backups/` with naming:
 
-```bash
-clients-YYYYMMDD-HHMMSS.sql.gz
-```bash
+```text
+client_db_backup_YYYY-MM-DD_HH-MM-SS.sql.gz
+```
 
 #### Cleanup Old Backups
 
 Manually delete backups older than 30 days from your local repository:
 
 ```bash
-find db/data/backups/ -name "clients-*.sql.gz" -mtime +30 -delete
-```bash
+find db/data/backups/ -name "client_db_backup_*.sql.gz" -mtime +30 -delete
+```
 
 Or manage backups manually by moving them to long-term storage:
 
 ```bash
 # Move old backups to S3, network drive, or archive
-mv db/data/backups/clients-202501*.sql.gz /path/to/archive/
-```bash
+mv db/data/backups/client_db_backup_202501*.sql.gz /path/to/archive/
+```
 
 #### Cleanup Completed Jobs
 
 ```bash
 ./scripts/containerManagement/cleanup-container.sh
-```bash
+```
 
 Removes:
 
@@ -443,7 +435,7 @@ Export schema without data:
 
 ```bash
 ./scripts/dbManagement/export-schema.sh
-```bash
+```
 
 Schema saved to `db/data/exports/schema-$(date).sql`.
 
@@ -453,40 +445,11 @@ Check slow query log:
 
 ```bash
 kubectl exec -it client-database-mysql-0 -n $NAMESPACE -- tail -f /var/log/mysql/slow.log
-```bash
+```
 
 #### Backup Test
 
 Verify a backup can be restored in a test namespace.
-
-### Schema Migrations
-
-#### Create Migration
-
-```bash
-migrate create -ext sql -dir migrations -seq add_client_metadata
-```bash
-
-Creates:
-
-- `migrations/000002_add_client_metadata.up.sql`
-- `migrations/000002_add_client_metadata.down.sql`
-
-#### Apply Migration
-
-```bash
-./scripts/dbManagement/migrate.sh
-```bash
-
-This creates a Kubernetes Job that runs golang-migrate.
-
-#### Rollback Migration
-
-Edit the migration Job to run:
-
-```bash
-migrate -path=/migrations -database "mysql://..." down 1
-```bash
 
 ### Scaling Operations
 
@@ -494,7 +457,7 @@ migrate -path=/migrations -database "mysql://..." down 1
 
 ```bash
 ./scripts/containerManagement/stop-container.sh
-```bash
+```
 
 Confirmation required. Stops MySQL gracefully.
 
@@ -502,7 +465,7 @@ Confirmation required. Stops MySQL gracefully.
 
 ```bash
 ./scripts/containerManagement/start-container.sh
-```bash
+```
 
 Starts MySQL StatefulSet.
 
@@ -512,7 +475,7 @@ Edit `k8s/configmap-template.yaml`, then:
 
 ```bash
 ./scripts/containerManagement/update-container.sh
-```bash
+```
 
 This updates the ConfigMap and restarts MySQL.
 
@@ -526,6 +489,7 @@ This updates the ConfigMap and restarts MySQL.
 
 <!-- markdownlint-disable MD029 -->
 1. Check logs:
+
    ```bash
    kubectl logs client-database-mysql-0 -n $NAMESPACE --previous
    ```
@@ -666,7 +630,7 @@ Add mysql_exporter sidecar for detailed metrics:
 ```bash
 kubectl describe pod client-database-mysql-0 -n $NAMESPACE
 kubectl logs client-database-mysql-0 -n $NAMESPACE
-```bash
+```
 
 **Common Causes**:
 
@@ -690,7 +654,7 @@ kubectl logs client-database-mysql-0 -n $NAMESPACE | grep -i error
 
 # Verify Secret
 kubectl get secret client-database-secrets -n $NAMESPACE -o yaml
-```bash
+```
 
 **Common Causes**:
 
@@ -732,14 +696,14 @@ cat .env | grep DB_MAINT
 
 ```bash
 # Check slow query log
-kubectl exec -it mysql-0 -n $NAMESPACE -- tail -100 /var/log/mysql/slow.log
+kubectl exec -it client-database-mysql-0 -n $NAMESPACE -- tail -100 /var/log/mysql/slow.log
 
 # Check connection count
-kubectl exec -it mysql-0 -n $NAMESPACE -- mysql -uroot -p$MYSQL_ROOT_PASSWORD -e "SHOW STATUS LIKE 'Threads_connected';"
+kubectl exec -it client-database-mysql-0 -n $NAMESPACE -- mysql -uroot -p$MYSQL_ROOT_PASSWORD -e "SHOW STATUS LIKE 'Threads_connected';"
 
 # Check table indexes
-kubectl exec -it mysql-0 -n $NAMESPACE -- mysql -uroot -p$MYSQL_ROOT_PASSWORD client_db -e "SHOW INDEX FROM oauth2_clients;"
-```bash
+kubectl exec -it client-database-mysql-0 -n $NAMESPACE -- mysql -uroot -p$MYSQL_ROOT_PASSWORD client_db -e "SHOW INDEX FROM oauth2_clients;"
+```
 
 **Common Causes**:
 
@@ -810,13 +774,10 @@ make status
 make backup
 
 # Restore from backup
-make restore FILE=clients-20250106-120000.sql.gz
+make restore FILE=client_db_backup_2025-01-06_12-00-00.sql.gz
 
 # Connect to MySQL
 make connect
-
-# Run migrations
-make migrate
 
 # Stop MySQL (maintenance)
 make stop
@@ -829,7 +790,7 @@ make cleanup
 
 # Update MySQL configuration
 make update
-```bash
+```
 
 ## Security Hardening
 
@@ -867,7 +828,7 @@ spec:
     ports:
     - protocol: TCP
       port: 3306
-```bash
+```
 
 ## Cost Optimization
 
@@ -947,18 +908,15 @@ After successful deployment:
 ## Appendix: Environment Variables Reference
 
 | Variable | Description | Example | Required |
-|----------|-------------|---------|----------|
+| -------- | ----------- | ------- | -------- |
 | `MYSQL_HOST` | MySQL hostname | `client-database` | Yes |
 | `MYSQL_PORT` | MySQL port | `3306` | Yes |
 | `MYSQL_DATABASE` | Database name | `client_db` | Yes |
 | `MYSQL_ROOT_PASSWORD` | Root password | `<secure-password>` | Yes |
-| `MYSQL_USER` | Application user | `client_db_user` | Yes |
-| `MYSQL_PASSWORD` | Application password | `<secure-password>` | Yes |
-| `MYSQL_BACKUP_USER` | Backup user | `backup_user` | Yes |
-| `MYSQL_BACKUP_PASSWORD` | Backup password | `<secure-password>` | Yes |
-| `NAMESPACE` | Kubernetes namespace | `client-database` | Yes |
-| `STATEFULSET_NAME` | StatefulSet name | `client-database-mysql` | Yes |
-| `SERVICE_NAME` | Service name | `client-database` | Yes |
+| `DB_MAINT_USERNAME` | Maintenance user | `db-maint-user` | Yes |
+| `DB_MAINT_PASSWORD` | Maintenance password | `<secure-password>` | Yes |
+| `AUTH_SERVICE_USERNAME` | Application user | `auth-service-user` | Yes |
+| `AUTH_SERVICE_PASSWORD` | Application password | `<secure-password>` | Yes |
 | `BACKUP_RETENTION_DAYS` | Backup retention | `30` | No |
 
 ## Appendix: Useful Commands
@@ -980,7 +938,7 @@ kubectl port-forward svc/client-database 3306:3306 -n $NAMESPACE
 
 # Delete all resources
 kubectl delete statefulset,service,pvc,configmap,secret -l app=client-database -n $NAMESPACE
-```bash
+```
 
 ### MySQL
 
@@ -1001,8 +959,8 @@ DESCRIBE oauth2_clients;
 SELECT COUNT(*) FROM oauth2_clients;
 
 # Check user permissions
-SHOW GRANTS FOR 'client_db_user'@'%';
-```bash
+SHOW GRANTS FOR 'auth-service-user'@'%';
+```
 
 ### Backup/Restore
 
@@ -1010,16 +968,16 @@ SHOW GRANTS FOR 'client_db_user'@'%';
 # Backups are stored locally in db/data/backups/
 ls -lh db/data/backups/
 
-# Manual backup (if Job script fails)
+# Manual backup (if script fails)
 kubectl exec client-database-mysql-0 -n $NAMESPACE -- mysqldump -uroot -p$MYSQL_ROOT_PASSWORD --single-transaction client_db | gzip > db/data/backups/manual-backup-$(date +%Y%m%d).sql.gz
 
-# Manual restore (if Job script fails)
+# Manual restore (if script fails)
 ./scripts/containerManagement/stop-container.sh
-gunzip < db/data/backups/clients-20250106.sql.gz | kubectl exec -i mysql-0 -n $NAMESPACE -- mysql -uroot -p$MYSQL_ROOT_PASSWORD client_db
+gunzip < db/data/backups/client_db_backup_20250106.sql.gz | kubectl exec -i client-database-mysql-0 -n $NAMESPACE -- mysql -uroot -p$MYSQL_ROOT_PASSWORD client_db
 ./scripts/containerManagement/start-container.sh
 
 # Copy backup to external storage
-cp db/data/backups/clients-20250106.sql.gz /mnt/backups/
+cp db/data/backups/client_db_backup_20250106.sql.gz /mnt/backups/
 # or
-aws s3 cp db/data/backups/clients-20250106.sql.gz s3://my-bucket/database-backups/
-```bash
+aws s3 cp db/data/backups/client_db_backup_20250106.sql.gz s3://my-bucket/database-backups/
+```

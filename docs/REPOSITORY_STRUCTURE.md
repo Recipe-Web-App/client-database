@@ -1,7 +1,6 @@
 # Client Database - Repository Structure
 
-This document outlines the complete directory structure and file organization for the client-database repository,
-mirroring the structure of the recipe-database repository.
+This document outlines the complete directory structure and file organization for the client-database repository.
 
 ## Directory Tree
 
@@ -14,8 +13,8 @@ client-database/
 │   │   │   ├── 002_create_oauth2_clients_table.sql
 │   │   │   └── 003_create_indexes.sql
 │   │   └── users/                   # Database user creation files
-│   │       ├── 001_create_app_user-template.sql
-│   │       └── 002_create_backup_user-template.sql
+│   │       ├── 001_create_maint_user-template.sql
+│   │       └── 002_create_auth_service_user-template.sql
 │   ├── fixtures/                    # Test data files
 │   │   └── 001_sample_clients.sql
 │   ├── data/                        # Local data storage
@@ -32,50 +31,60 @@ client-database/
 │   │   ├── start-container.sh
 │   │   ├── stop-container.sh
 │   │   └── update-container.sh
-│   ├── dbManagement/                # Database operation scripts (8 files)
+│   ├── dbManagement/                # Database operation scripts (7 files)
 │   │   ├── backup-db.sh
 │   │   ├── db-connect.sh
 │   │   ├── export-schema.sh
 │   │   ├── load-schema.sh
 │   │   ├── load-test-fixtures.sh
-│   │   ├── migrate.sh
 │   │   ├── restore-db.sh
 │   │   └── verify-health.sh
-│   ├── jobHelpers/                  # Scripts for Kubernetes jobs (2 files)
-│   │   ├── db-load-schema.sh
-│   │   └── db-load-test-fixtures.sh
-│   └── utils/                       # Shared utility functions
-│       └── common.sh
+│   └── jobHelpers/                  # Scripts for Kubernetes jobs (2 files)
+│       ├── db-load-schema.sh
+│       └── db-load-test-fixtures.sh
 ├── k8s/                             # Kubernetes manifests
 │   ├── configmap-template.yaml      # MySQL configuration (my.cnf)
 │   ├── secret-template.yaml         # Passwords and credentials (envsubst)
+│   ├── service-nodeport-template.yaml  # External access service (envsubst)
 │   ├── statefulset.yaml             # MySQL StatefulSet
 │   ├── service.yaml                 # MySQL Service (port 3306)
 │   ├── pvc.yaml                     # Database storage PVC
-│   ├── README.md                    # K8s resource documentation
 │   └── jobs/                        # Kubernetes Job manifests (3 files)
 │       ├── db-load-schema-job.yaml  # Loads initial schema and creates users
 │       ├── db-load-test-fixtures-job.yaml  # Loads test data
-│       └── db-migrate-job.yaml      # Runs golang-migrate for schema changes
-├── migrations/                      # Schema migrations (golang-migrate)
-│   ├── 000001_initial_schema.up.sql
-│   ├── 000001_initial_schema.down.sql
-│   └── README.md
+│       └── db-migrate-job.yaml      # For future schema migrations
 ├── docs/                            # Documentation
-│   ├── architecture.md              # System design and architecture
-│   ├── deployment.md                # K8s deployment guide
-│   ├── operations.md                # Backup/restore/maintenance
-│   ├── schema-design.md             # Database schema explanation
-│   └── scaling.md                   # Read replicas, managed MySQL
-├── tools/                           # Container tools
-│   └── Dockerfile                   # MySQL + migration tools
+│   ├── ARCHITECTURE.md              # System design and architecture
+│   ├── DATABASE_DESIGN.md           # Database schema explanation
+│   ├── DEPLOYMENT_PLAN.md           # K8s deployment guide and operations
+│   └── REPOSITORY_STRUCTURE.md      # This file - directory structure
+├── tools/                           # Container images and utilities
+│   ├── Dockerfile.mysql             # Custom MySQL 8.0 server image
+│   ├── Dockerfile.jobs              # Jobs image for K8s operations
+│   ├── .dockerignore.mysql          # Build context for MySQL image
+│   ├── .dockerignore.jobs           # Build context for Jobs image
+│   └── README.md                    # Docker documentation
+├── .github/                         # GitHub configuration
+│   ├── workflows/                   # CI/CD workflows
+│   ├── ISSUE_TEMPLATE/              # Issue templates
+│   ├── DISCUSSION_TEMPLATE/         # Discussion templates
+│   ├── CONTRIBUTING.md              # Contribution guidelines
+│   ├── SECURITY.md                  # Security policy
+│   ├── SUPPORT.md                   # Support information
+│   └── pull_request_template.md     # PR template
 ├── .env.example                     # Environment variables template
 ├── .env                             # Actual environment variables (gitignored)
 ├── .gitignore                       # Git ignore rules
+├── .pre-commit-config.yaml          # Pre-commit hooks configuration
+├── .sqlfluff                        # SQL linting configuration
+├── .yamllint.yaml                   # YAML linting configuration
+├── .markdownlint.yaml               # Markdown linting configuration
+├── .commitlintrc.json               # Commit message linting
+├── .kube-linter.yaml                # Kubernetes manifest linting
+├── .gitleaksignore                  # Gitleaks ignore rules
 ├── Makefile                         # Common operations
 ├── README.md                        # Project overview
-├── CLAUDE.md                        # Claude Code guidance
-└── CHANGELOG.md                     # Version history
+└── CLAUDE.md                        # Claude Code guidance
 ```
 
 ## Directory Purposes
@@ -94,7 +103,7 @@ Contains all database-related files including schema definitions, user creation 
 
 - Template files for creating database users
 - Uses `envsubst` for environment variable substitution
-- Separate users for application and backup operations
+- Creates maintenance user and auth-service application user
 
 #### db/fixtures/
 
@@ -123,24 +132,21 @@ Hierarchically organized scripts for different operational domains.
 - Kubernetes and Docker operations
 - Deploy, start, stop, update, status, cleanup
 - Infrastructure management scripts
+- **Run locally** - uses kubectl commands
 
 #### scripts/dbManagement/
 
 - Database-specific operations
-- Schema loading, backups, restores, migrations
-- Direct interaction with MySQL
+- Schema loading, backups, restores, health checks
+- Direct interaction with MySQL via kubectl exec
+- **Run locally** - creates Jobs or uses kubectl exec
 
 #### scripts/jobHelpers/
 
 - Scripts designed to run inside Kubernetes Job pods
 - Execute operations within the cluster
 - Mounted into Job containers
-
-#### scripts/utils/
-
-- Shared utility functions
-- Common logging, color output, error handling
-- Sourced by other scripts
+- **Run inside K8s pods** - direct MySQL access
 
 ### `k8s/` - Kubernetes Manifests
 
@@ -150,8 +156,9 @@ All Kubernetes resource definitions for deploying MySQL.
 
 - `configmap-template.yaml` - MySQL configuration (my.cnf settings)
 - `secret-template.yaml` - Credentials (uses envsubst for substitution)
+- `service-nodeport-template.yaml` - External access service (uses envsubst)
 - `statefulset.yaml` - MySQL StatefulSet definition
-- `service.yaml` - Service exposing MySQL on port 3306
+- `service.yaml` - ClusterIP Service exposing MySQL on port 3306
 - `pvc.yaml` - Persistent volume for database storage
 
 #### k8s/jobs/
@@ -159,59 +166,44 @@ All Kubernetes resource definitions for deploying MySQL.
 - Job templates for initialization operations
 - Schema loading Job: Executes SQL files from `db/init/schema/` and `db/init/users/`
 - Test fixtures Job: Loads sample data from `db/fixtures/`
-- Migration Job: Runs golang-migrate for schema changes
-- Triggered manually via dbManagement scripts
+- Migrate Job: Placeholder for future schema migrations
 - Note: Backup/restore use direct kubectl exec (not Jobs)
-
-### `migrations/` - Schema Migrations
-
-golang-migrate compatible migration files.
-
-- Up migrations: Apply schema changes
-- Down migrations: Rollback schema changes
-- Numbered sequentially (000001, 000002, etc.)
 
 ### `docs/` - Documentation
 
 Comprehensive documentation for the repository.
 
-- `architecture.md` - System design, technology choices
-- `deployment.md` - K8s deployment instructions
-- `operations.md` - Day-to-day operations manual
-- `schema-design.md` - Database schema documentation
-- `scaling.md` - Future scaling strategies
+- `ARCHITECTURE.md` - System design, technology choices
+- `DATABASE_DESIGN.md` - Database schema documentation
+- `DEPLOYMENT_PLAN.md` - K8s deployment instructions and operations manual
+- `REPOSITORY_STRUCTURE.md` - This file
 
-### `tools/` - Container Tools
+### `tools/` - Container Images
 
 Docker configuration for building custom container images used in Kubernetes deployments.
 
-**Image Strategy:**
+**Two Custom Docker Images:**
 
-- **MySQL StatefulSet**: Uses official `mysql:8.0` image directly (no customization)
-- **Kubernetes Jobs**: Uses custom `client-database-jobs` image (built from this directory)
+1. **MySQL Server Image** (`Dockerfile.mysql`)
+   - Base: Official `mysql:8.0` (Oracle Linux)
+   - Adds debugging tools: curl, wget, netcat, htop, vim
+   - Used by: StatefulSet
+   - Size: ~700-800MB
+
+2. **Jobs Image** (`Dockerfile.jobs`)
+   - Base: `debian:bookworm-slim`
+   - Contains: MySQL client, mysqldump, envsubst, bash, gzip
+   - Used by: Kubernetes Jobs
+   - Size: ~150-200MB
+   - Non-root user (UID 10001)
 
 **Files:**
 
-- `Dockerfile` - Multi-stage Dockerfile for building the Jobs image
-- `.dockerignore` - Build context exclusions (reduces context size ~90%)
-- `README.md` - Comprehensive Docker documentation and usage guide
-
-**Jobs Image Contents:**
-
-- MySQL client tools (`mysql`, `mysqldump`) for database operations
-- `golang-migrate` for schema migrations
-- `envsubst` for template substitution
-- SQL initialization files (schema, users, fixtures)
-- Job helper scripts (backup, restore, migrations, schema loading)
-- Non-root user execution (UID 10001) for security
-
-**Build Best Practices:**
-
-- Multi-stage build (builder + minimal runtime)
-- Minimal base image (`debian:bookworm-slim`, ~150-200MB final size)
-- Version-pinned dependencies for reproducibility
-- Security scanning with hadolint and trivy
-- Non-root user for all operations
+- `Dockerfile.mysql` - MySQL server image
+- `Dockerfile.jobs` - Multi-stage Jobs image
+- `.dockerignore.mysql` - Build context exclusions for MySQL image
+- `.dockerignore.jobs` - Build context exclusions for Jobs image
+- `README.md` - Comprehensive Docker documentation
 
 ## File Naming Conventions
 
@@ -220,7 +212,6 @@ Docker configuration for building custom container images used in Kubernetes dep
 - **Schema files**: `NNN_action_object.sql` (e.g., `001_create_database.sql`)
 - **Fixture files**: `NNN_table_name.sql` (e.g., `001_sample_clients.sql`)
 - **User files**: `NNN_description-template.sql` (for envsubst substitution)
-- **Migration files**: `NNNNNN_description.{up,down}.sql`
 
 ### Shell Scripts
 
@@ -230,14 +221,13 @@ Docker configuration for building custom container images used in Kubernetes dep
 
 ### Kubernetes Manifests
 
-- **Component-type.yaml**: `deployment.yaml`, `service.yaml`, `pvc.yaml`
+- **Component-type.yaml**: `statefulset.yaml`, `service.yaml`, `pvc.yaml`
 - **Templates**: `*-template.yaml` (requires envsubst)
 - **Jobs**: `db-action-target-job.yaml`
 
 ### Documentation
 
-- **All lowercase**: `architecture.md`, `deployment.md`
-- **Hyphenated**: `schema-design.md`
+- **All uppercase**: `ARCHITECTURE.md`, `DEPLOYMENT_PLAN.md`
 - **Descriptive**: Clear purpose from filename
 
 ## Configuration Files
@@ -246,23 +236,29 @@ Docker configuration for building custom container images used in Kubernetes dep
 
 - `.env.example` - Template with all required environment variables
 - `.env` - Actual values (gitignored, never committed)
-- `.gitignore` - Excludes `.env`, `db/data/`, `*.sql` dumps, backups
+- `.gitignore` - Excludes `.env`, `db/data/`, backups
 - `Makefile` - Common operations (deploy, backup, restore, etc.)
 - `README.md` - Project overview and quick start
 - `CLAUDE.md` - Detailed guidance for Claude Code
-- `CHANGELOG.md` - Version history and release notes
+
+### Linting Configuration
+
+- `.sqlfluff` - SQL linting rules
+- `.yamllint.yaml` - YAML linting rules
+- `.markdownlint.yaml` - Markdown linting rules
+- `.commitlintrc.json` - Conventional commit enforcement
+- `.kube-linter.yaml` - Kubernetes manifest validation
+- `.pre-commit-config.yaml` - Pre-commit hooks (12+ linters)
 
 ## Total File Count
 
-- **db/**: 9 files (3 schema + 2 users + 1 fixture + 1 query + 2 .gitkeep)
-- **scripts/**: 19 files (6 containerManagement + 8 dbManagement + 4 jobHelpers + 1 utils)
-- **k8s/**: 10 files (5 core + 4 jobs + 1 README)
-- **migrations/**: 3 files (1 up + 1 down + 1 README)
-- **docs/**: 5 files
-- **tools/**: 3 files (Dockerfile + .dockerignore + README.md)
-- **root**: 7 files (.env.example, .env, .gitignore, Makefile, README, CLAUDE, CHANGELOG)
-
-Total: ~56 files
+- **db/**: 8 files (3 schema + 2 users + 1 fixture + 1 query + 1 .gitkeep)
+- **scripts/**: 15 files (6 containerManagement + 7 dbManagement + 2 jobHelpers)
+- **k8s/**: 9 files (6 core + 3 jobs)
+- **docs/**: 4 files
+- **tools/**: 5 files (2 Dockerfiles + 2 .dockerignore + 1 README)
+- **.github/**: 11+ workflows, templates, and docs
+- **root**: 10+ files (config, Makefile, README, CLAUDE.md)
 
 ## Design Philosophy
 
@@ -275,17 +271,3 @@ This structure follows these principles:
 5. **Job-Based Operations** - Kubernetes-native operational patterns
 6. **Comprehensive Documentation** - Every aspect documented
 7. **Production Ready** - Backup, restore, monitoring included
-
-## Comparison to recipe-database
-
-This structure mirrors recipe-database with these adaptations:
-
-- **Simpler schema** - OAuth2 credentials vs complex recipe data
-- **No Python** - MySQL-only, no data processing pipeline
-- **No monitoring stack** - Can add prometheus-exporter later if needed
-- **Fewer fixtures** - Only sample OAuth2 clients
-- **golang-migrate** - Instead of custom migration scripts
-- **Direct kubectl exec backups** - Backups stream to local filesystem, no Jobs/volumes needed
-
-The core organizational principles remain the same: hierarchical scripts, numbered schema files, Job-based initialization,
-and comprehensive documentation.
