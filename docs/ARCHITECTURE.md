@@ -76,14 +76,7 @@ simplicity.
 - **StatefulSet**: Stable network identity, persistent storage
 - **PersistentVolumeClaim**: Durable storage for database files
 - **Service**: Stable DNS endpoint for database connections
-- **Jobs**: One-time operations (backup, restore, migrations)
-
-### Migration Tool: golang-migrate
-
-- Simple, SQL-based migrations
-- Up/down migration support
-- Version tracking in database
-- CLI and Go library available
+- **Jobs**: One-time operations (schema loading, test fixtures)
 
 ## Architecture Decisions
 
@@ -122,13 +115,12 @@ simplicity.
 
 **Kubernetes Jobs for Initialization:**
 
-- **Complex operations**: Schema loading, migrations, test fixtures
+- **Complex operations**: Schema loading, test fixtures
 - **Cluster-native**: Runs inside Kubernetes with proper RBAC
 - **Audit trail**: Kubernetes tracks Job history
 - **Template substitution**: Uses envsubst for environment-specific SQL
 - **Operations**:
   - Schema load: Execute db/init/schema/*.sql and db/init/users/*.sql files
-  - Migrations: Run golang-migrate with versioned migrations
   - Test fixtures: Load sample data from db/fixtures/
 
 ### 3. Template-Based Configuration
@@ -189,7 +181,6 @@ simplicity.
 - `scripts/containerManagement/` - Kubernetes operations
 - `scripts/dbManagement/` - Database operations
 - `scripts/jobHelpers/` - Scripts for Job pods
-- `scripts/utils/` - Shared utilities
 
 ## Deployment Architecture
 
@@ -652,5 +643,4 @@ readinessProbe:
 
 - MySQL 8.0 Documentation: https://dev.mysql.com/doc/refman/8.0/
 - Kubernetes StatefulSets: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
-- golang-migrate: https://github.com/golang-migrate/migrate
 - bcrypt: https://pkg.go.dev/golang.org/x/crypto/bcrypt

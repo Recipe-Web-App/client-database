@@ -4,283 +4,106 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **MySQL 8.0 database infrastructure repository** for storing OAuth2 client credentials used by the auth-service in a microservices architecture. It's deployed to Kubernetes using StatefulSets and optimized for read-heavy workloads (100-1000 qps).
+MySQL 8.0 database infrastructure repository for storing OAuth2 client credentials used by the auth-service. Deployed to Kubernetes using StatefulSets, optimized for read-heavy workloads (100-1000 qps). No application code - pure infrastructure.
 
-### Current Implementation Status
+## Essential Commands
 
-**IMPORTANT**: This repository is currently in a **planning/documentation phase** (deployment-impl branch). Comprehensive documentation exists in `docs/`, database schema is complete in `db/init/`, and infrastructure configuration is in place:
+```bash
+# First-time setup
+make init                    # Check deps, setup .env, install pre-commit hooks
 
-- `k8s/` - **COMPLETE** - Kubernetes manifests (StatefulSet, Service, Jobs, PVCs)
-- `tools/` - **COMPLETE** - Custom Docker images (MySQL server + Jobs)
-- `scripts/` - **NOT YET CREATED** - Operational bash scripts (containerManagement/, dbManagement/, jobHelpers/)
-- `migrations/` - **NOT YET CREATED** - golang-migrate migration files
+# Deployment
+make deploy                  # Deploy to Kubernetes
+make status                  # Check deployment status
 
-When implementing remaining directories, follow the patterns documented in `docs/REPOSITORY_STRUCTURE.md` and `docs/DEPLOYMENT_PLAN.md`.
+# Database operations
+make connect                 # MySQL shell
+make backup                  # Create timestamped backup
+make restore BACKUP_FILE=... # Restore from backup
+make load-schema             # Initialize schema (first-time)
+make migrate                 # Run golang-migrate migrations
 
-## Technology Stack
+# Development
+make lint                    # Run all linters (12+ tools)
+make docker-build            # Build both Docker images
+make docker-ci               # Full CI: lint, build, scan, test
+make port-forward            # Forward MySQL to localhost:3306
+```
 
-- **Database**: MySQL 8.0 with InnoDB storage engine
-- **Platform**: Kubernetes 1.20+ (no application code - pure infrastructure)
-- **Container Images**: Custom Docker images for MySQL server and Jobs
-- **Configuration**: envsubst for template-based Kubernetes manifests
-- **Migrations**: golang-migrate
-- **Backup/Restore**: mysqldump via kubectl exec (direct streaming to/from local filesystem)
-- **Scripting**: Bash
-- **Security**: bcrypt password hashing (cost factor 10)
+## Architecture
 
-## Key Architectural Patterns
+### Two Custom Docker Images
 
-### 1. Custom Docker Images
+- **`client-database-mysql`** (`tools/Dockerfile.mysql`): MySQL 8.0 + debugging tools for StatefulSet
+- **`client-database-jobs`** (`tools/Dockerfile.jobs`): MySQL client + golang-migrate + envsubst for K8s Jobs
 
-We use **two custom-built Docker images** for complete control over the MySQL environment:
+### Kubernetes Resources
 
-**MySQL Server Image** (`client-database-mysql:latest`):
-- Base: Official `mysql:8.0` (Oracle Linux)
-- Adds: Production debugging tools (curl, wget, netcat, htop, vim, etc.)
-- Used by: StatefulSet (`k8s/statefulset.yaml`)
-- Dockerfile: `tools/Dockerfile.mysql`
-- Build: `make docker-build-mysql`
+- **StatefulSet**: Single MySQL replica with PVC (10Gi)
+- **ClusterIP Service**: Internal-only access on port 3306
+- **Jobs**: Schema loading, migrations, test fixtures (`k8s/jobs/`)
 
-**Jobs Image** (`client-database-jobs:latest`):
-- Base: Debian Bookworm Slim
-- Includes: MySQL client, golang-migrate, envsubst, bash
-- Used by: Kubernetes Jobs for migrations, schema loading, test fixtures
-- Dockerfile: `tools/Dockerfile.jobs`
-- Build: `make docker-build-jobs`
+### Database Schema
 
-**Why custom images?**
-- Version control: Pin exact MySQL version and tool versions
-- Production readiness: Include debugging and monitoring utilities
-- Consistency: Same images across dev, staging, and production
-- Security: Control base images and apply patches independently
-
-### 2. Kubernetes-Native Deployment
-
-All operations are Kubernetes-native:
-
-- **StatefulSet** for MySQL (single replica initially, can scale to read replicas)
-- **ClusterIP Service** for internal-only access (port 3306)
-- **PersistentVolumeClaim** for database storage (10Gi)
-- **Jobs** for initialization tasks (schema loading, migrations, test fixtures)
-
-### 3. Direct kubectl exec for Backup/Restore
-
-Backup and restore operations use **direct kubectl exec** commands instead of Kubernetes Jobs:
-
-- Backup: `kubectl exec ... mysqldump | gzip > local_file`
-- Restore: `gunzip < local_file | kubectl exec -i ... mysql`
-- Backups stored locally in repository at `db/data/backups/`
-- No hostPath volumes or Job complexity needed
-- Simpler, more maintainable approach
-- Works on any Kubernetes cluster (not limited to single-node setups)
-
-### 4. Template-Based Configuration
-
-No hardcoded secrets or environment-specific values:
-
-- Use `envsubst` to replace environment variables in Kubernetes manifests
-- All configuration via `.env` files
-- Secrets stored in Kubernetes Secrets, never in code
-
-### 5. Read-Optimized Single-Table Design
-
-Database: `client_db`
-Table: `oauth2_clients`
-
-**Schema optimized for fast lookups**:
-
-- Primary key on `client_id` (clustered B-tree index)
-- Additional indexes: `is_active`, `client_name`
-- Expected performance: <5ms (p99) for PK lookups
-- Connection pool: 25 max connections, 10 idle
-
-**Key fields**:
-
-- `client_id` (VARCHAR(255), PK) - Unique client identifier
-- `client_secret_hash` (VARCHAR(255)) - bcrypt hashed secret (NEVER plaintext)
-- `client_name` (VARCHAR(255)) - Human-readable name
-- `grant_types` (JSON) - Allowed OAuth2 grant types array
-- `scopes` (JSON) - Allowed scopes array
-- `redirect_uris` (JSON, nullable) - Redirect URIs
-- `is_active` (BOOLEAN) - Soft delete flag (use instead of DELETE)
+Single table `oauth2_clients` in database `client_db`:
+- `client_id` (VARCHAR(255), PK) - OAuth2 client identifier
+- `client_secret_hash` (VARCHAR(255)) - bcrypt hash (cost factor 10)
+- `grant_types`, `scopes`, `redirect_uris` (JSON arrays)
+- `is_active` (BOOLEAN) - **Soft delete flag - NEVER use DELETE**
 - Audit fields: `created_at`, `updated_at`, `created_by`
-- `metadata` (JSON, nullable) - Extensible metadata
 
-### 6. Script Execution Context
+Schema files: `db/init/schema/001_*.sql`, `002_*.sql`, `003_*.sql` (numbered for execution order)
 
-When working with operational scripts, note the execution context:
+### Script Execution Context
 
-- `scripts/containerManagement/*` - Run on **local machine** (uses kubectl)
-- `scripts/dbManagement/*` - Run on **local machine** (direct kubectl exec or creates Kubernetes Jobs)
-- `scripts/jobHelpers/*` - Run **inside Kubernetes Job pods** (direct MySQL access)
+- `scripts/containerManagement/*` - Run **locally** (kubectl commands)
+- `scripts/dbManagement/*` - Run **locally** (creates Jobs or kubectl exec)
+- `scripts/jobHelpers/*` - Run **inside K8s Job pods** (direct MySQL access)
 
-**Operational approaches:**
-- **Direct kubectl exec**: Simple operations (backup, restore, db-connect, export-schema, verify-health)
-- **Kubernetes Jobs**: Complex initialization operations (load-schema, load-test-fixtures, migrations)
+### Backup/Restore Pattern
 
-## Essential Development Commands
-
-### Deployment Operations
-
+Uses **direct kubectl exec streaming** (not Jobs):
 ```bash
-make deploy          # Deploy to Kubernetes (runs scripts/containerManagement/deploy-container.sh)
-make status          # Check deployment status
-make start           # Start MySQL StatefulSet
-make stop            # Stop MySQL for maintenance
-make cleanup         # Cleanup old Job pods
+# Backup: kubectl exec mysqldump | gzip > local_file
+# Restore: gunzip < local_file | kubectl exec -i mysql
 ```
+Backups stored in `db/data/backups/` (gitignored).
 
-### Database Operations
+## Critical Patterns
 
-```bash
-make backup          # Create timestamped backup in db/data/backups/
-make restore BACKUP_FILE=clients-20250106-120000.sql.gz  # Restore from specific backup
-make connect         # Connect to MySQL shell
-make migrate         # Run schema migrations (golang-migrate)
-make load-schema     # Initialize database schema (first-time setup)
-make load-fixtures   # Load test data from db/fixtures/
-make health          # Run health check query
-```
+### Soft Deletes Only
 
-### Development Utilities
+**NEVER DELETE from oauth2_clients**. Always:
+- Set `is_active = FALSE` for soft deletes
+- Include `WHERE is_active = TRUE` in queries
 
-```bash
-make port-forward    # Forward MySQL to localhost:3306 for local access
-make logs            # View MySQL pod logs (follows)
-make shell           # Open bash shell in MySQL pod
-make list-backups    # List all backups with sizes
-make clean-backups   # Delete backups >30 days old
-```
+### Template-Based Configuration
 
-### Linting and Pre-commit
+K8s manifests use `envsubst` for variable substitution:
+- `*-template.yaml` files require environment variables from `.env`
+- Credentials in Kubernetes Secrets, never in code
 
-```bash
-make pre-commit-install  # Install pre-commit hooks (required for development)
-make lint                # Run all linters (12+ tools: sqlfluff, shellcheck, yamllint, etc.)
-make lint-sql            # Lint SQL files only
-make lint-shell          # Lint bash scripts only
-make lint-k8s            # Validate Kubernetes manifests
-make scan-secrets        # Scan for accidentally committed secrets (gitleaks)
-```
+### Pre-commit Hooks
 
-### Initialization
+12+ linters run on every commit: sqlfluff (SQL), shellcheck/shfmt (bash), kube-linter (K8s), hadolint (Docker), gitleaks (secrets), trivy (vulnerabilities), commitlint (conventional commits).
 
-```bash
-make init            # First-time setup: check deps, create .env, install pre-commit hooks
-make check-deps      # Verify kubectl, envsubst, mysql client, etc. are installed
-```
+Install: `make pre-commit-install`
+
+### File Naming Conventions
+
+- SQL: `NNN_action_object.sql` (e.g., `001_create_database.sql`)
+- Scripts: `action-object.sh` (kebab-case)
+- K8s: `component.yaml` or `*-template.yaml` for envsubst
+
+## Key Reference Files
+
+- **Schema**: `db/init/schema/002_create_oauth2_clients_table.sql`
+- **Architecture docs**: `docs/ARCHITECTURE.md`, `docs/DATABASE_DESIGN.md`
+- **Structure guide**: `docs/REPOSITORY_STRUCTURE.md`
+- **Deployment guide**: `docs/DEPLOYMENT_PLAN.md`
 
 ## Auth-Service Integration
 
-The auth-service connects via standard MySQL protocol over TCP:
-
-**Connection details**:
-
-- Host: `client-database` (within Kubernetes cluster)
-- Port: `3306`
-- Database: `client_db`
-- User: `client_db_user` (has SELECT, INSERT, UPDATE permissions)
-
-**Example Go connection** (from README.md):
-
-```go
-dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
-    os.Getenv("MYSQL_USER"),        // client_db_user
-    os.Getenv("MYSQL_PASSWORD"),    // from Kubernetes Secret
-    os.Getenv("MYSQL_HOST"),        // client-database
-    os.Getenv("MYSQL_PORT"),        // 3306
-    os.Getenv("MYSQL_DATABASE"),    // client_db
-)
-db, err := sql.Open("mysql", dsn)
-```
-
-**Security notes**:
-
-- ClusterIP service = cluster-internal only (no external access)
-- bcrypt hashing for `client_secret` field (NEVER store plaintext secrets)
-- Optional: TLS/SSL for MySQL connections, NetworkPolicies to restrict to auth-service pods only
-
-## Non-Standard Patterns to Know
-
-### 1. Documentation-First Approach
-
-This repository has **comprehensive documentation created before implementation**:
-
-- `docs/ARCHITECTURE.md` - System design, technology choices, design decisions
-- `docs/DATABASE_DESIGN.md` - Schema, queries, indexes, performance characteristics
-- `docs/DEPLOYMENT_PLAN.md` - Step-by-step deployment guide, troubleshooting
-- `docs/REPOSITORY_STRUCTURE.md` - Directory organization, file naming conventions
-
-**When implementing** k8s/, scripts/, migrations/, or tools/, follow the documented structure exactly.
-
-### 2. Mirrors recipe-database Structure
-
-This repository follows patterns from a related "recipe-database" repository:
-
-- Hierarchical script organization (containerManagement/, dbManagement/, jobHelpers/)
-- Numbered schema files (001_create_database.sql, 002_create_table.sql, 003_create_indexes.sql)
-- Job-based operational patterns
-- Template-based Kubernetes manifests with envsubst
-
-### 3. Extensive Pre-commit Hook Suite
-
-12+ linters and validators run on every commit:
-
-- **SQL**: sqlfluff (lint + fix)
-- **Shell**: shellcheck, shfmt
-- **YAML**: yamllint, prettier
-- **Kubernetes**: kube-linter
-- **Markdown**: markdownlint
-- **Docker**: hadolint
-- **Security**: gitleaks (secret scanning), trivy (vulnerability scanning)
-- **Commits**: commitlint (conventional commits)
-
-Always run `make lint` before committing, or install hooks with `make pre-commit-install`.
-
-### 4. Soft Deletes Required
-
-**NEVER use DELETE operations** on the `oauth2_clients` table. Instead:
-
-- Set `is_active = FALSE` for soft deletes
-- Use `WHERE is_active = TRUE` in all queries
-- Preserves audit history and enables recovery
-
-### 5. Script Execution Context
-
-When implementing scripts, note the execution context:
-
-- `scripts/containerManagement/*` - Run on **local machine** (uses kubectl)
-- `scripts/dbManagement/*` - Run on **local machine** (creates Kubernetes Jobs)
-- `scripts/jobHelpers/*` - Run **inside Kubernetes Job pods** (direct MySQL access)
-
-## Performance Characteristics
-
-- **Read latency**: <5ms (p99) for primary key lookups
-- **Throughput**: 100-1000 qps (read-heavy workload)
-- **Current scale**: Sufficient for <100 qps, 2 auth-service replicas
-
-**Scaling strategy**:
-
-- Current: Single MySQL instance
-- Add read replicas when: >500 qps, >5 auth-service replicas, or read latency >10ms
-- Long-term: Migrate to managed MySQL (RDS, Cloud SQL) for HA
-
-## Critical Reference Files
-
-When working on this repository, always reference:
-
-1. **Comprehensive documentation**: `docs/ARCHITECTURE.md`, `docs/DATABASE_DESIGN.md`, `docs/DEPLOYMENT_PLAN.md`, `docs/REPOSITORY_STRUCTURE.md`
-2. **Database schema**: `db/init/schema/002_create_oauth2_clients_table.sql`, `db/init/schema/003_create_indexes.sql`
-3. **All operational commands**: `Makefile`
-4. **Development standards**: `.pre-commit-config.yaml`
-5. **Project overview**: `README.md`
-
-## MySQL Users (Planned)
-
-Three users with least-privilege access:
-
-- `root` - Administrative operations (schema changes, user management)
-- `client_db_user` - Application user (SELECT, INSERT, UPDATE only - **NO DELETE**)
-- `backup_user` - Backup operations (SELECT, LOCK TABLES)
-
-Credentials stored in Kubernetes Secrets, never in code or environment files committed to git.
+Connection: `client-database:3306` (ClusterIP, cluster-internal only)
+Database: `client_db`
+User: `client_db_user` (SELECT, INSERT, UPDATE - no DELETE)
