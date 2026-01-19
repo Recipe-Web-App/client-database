@@ -1,0 +1,76 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":rebaseStalePrs",
+    ":semanticCommits",
+    "docker:pinDigests"
+  ],
+  "timezone": "America/New_York",
+  "schedule": ["before 10am on Monday"],
+  "prConcurrentLimit": 100,
+  "labels": ["dependencies"],
+  "assignees": ["jsamuelsen11"],
+  "minimumReleaseAge": "3 days",
+  "platformAutomerge": true,
+  "packageRules": [
+    {
+      "description": "Group all GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "addLabels": ["github-actions"],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "Docker updates with docker label",
+      "matchManagers": ["dockerfile"],
+      "addLabels": ["docker"],
+      "semanticCommitType": "docker"
+    },
+    {
+      "description": "Auto-merge patch updates",
+      "matchUpdateTypes": ["patch", "pin", "digest"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Minor updates - no auto-merge",
+      "matchUpdateTypes": ["minor"],
+      "automerge": false
+    },
+    {
+      "description": "Major updates - require dashboard approval",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "dependencyDashboardApproval": true,
+      "prBodyNotes": [
+        ":warning: **Major Version Update** - May contain breaking changes. Review carefully before merging."
+      ]
+    },
+    {
+      "description": "MySQL base image - extra caution",
+      "matchPackageNames": ["mysql"],
+      "matchManagers": ["dockerfile"],
+      "minimumReleaseAge": "14 days",
+      "prBodyNotes": [
+        ":database: **MySQL Base Image Update** - Test thoroughly: data compatibility, query performance, backup/restore procedures."
+      ]
+    },
+    {
+      "description": "Security actions - faster updates allowed",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": [
+        "aquasecurity/trivy-action",
+        "gitleaks/gitleaks-action"
+      ],
+      "schedule": ["at any time"],
+      "minimumReleaseAge": "1 day"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security", "dependencies"],
+    "schedule": ["at any time"],
+    "automerge": true
+  }
+}
