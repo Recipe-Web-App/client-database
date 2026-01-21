@@ -4,7 +4,8 @@
     "config:recommended",
     ":rebaseStalePrs",
     ":semanticCommits",
-    "docker:pinDigests"
+    "docker:pinDigests",
+    ":enablePreCommit"
   ],
   "timezone": "America/New_York",
   "schedule": ["before 10am on Monday"],
@@ -19,6 +20,13 @@
       "matchManagers": ["github-actions"],
       "groupName": "github-actions",
       "addLabels": ["github-actions"],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "Group all pre-commit hook updates",
+      "matchManagers": ["pre-commit"],
+      "groupName": "pre-commit-hooks",
+      "addLabels": ["pre-commit"],
       "semanticCommitType": "ci"
     },
     {
