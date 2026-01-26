@@ -1,8 +1,6 @@
-# Markdownlint ignore patterns
-# See https://github.com/igorshubovych/markdownlint-cli#ignoring-files
-
-# Ignore CLAUDE.md (AI assistant guidance file)
+AGENTS.md
 CLAUDE.md
+.beads/README.md
 
 # Ignore dependencies
 node_modules/
