@@ -170,3 +170,9 @@ test-backups/
 
 # Pre-Commit data
 .pre-commit-trivy-cache/
+
+# Serena
+.serena/
+
+# Beads
+.bv/
