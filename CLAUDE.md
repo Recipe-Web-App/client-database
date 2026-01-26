@@ -15,19 +15,25 @@ make init                    # Check deps, setup .env, install pre-commit hooks
 # Deployment
 make deploy                  # Deploy to Kubernetes
 make status                  # Check deployment status
+make cleanup                 # Remove old completed Job pods
 
 # Database operations
 make connect                 # MySQL shell
 make backup                  # Create timestamped backup
 make restore BACKUP_FILE=... # Restore from backup
 make load-schema             # Initialize schema (first-time)
-make migrate                 # Run golang-migrate migrations
+make load-fixtures           # Load test data
+
+# Debugging
+make logs                    # Tail MySQL pod logs
+make shell                   # Open bash shell in MySQL pod
+make port-forward            # Forward MySQL to localhost:3306
 
 # Development
 make lint                    # Run all linters (12+ tools)
+make lint-fix                # Auto-fix linting issues
 make docker-build            # Build both Docker images
 make docker-ci               # Full CI: lint, build, scan, test
-make port-forward            # Forward MySQL to localhost:3306
 ```
 
 ## Architecture
@@ -60,13 +66,14 @@ Schema files: `db/init/schema/001_*.sql`, `002_*.sql`, `003_*.sql` (numbered for
 - `scripts/dbManagement/*` - Run **locally** (creates Jobs or kubectl exec)
 - `scripts/jobHelpers/*` - Run **inside K8s Job pods** (direct MySQL access)
 
-### Backup/Restore Pattern
+### Operations Approach
 
-Uses **direct kubectl exec streaming** (not Jobs):
-```bash
-# Backup: kubectl exec mysqldump | gzip > local_file
-# Restore: gunzip < local_file | kubectl exec -i mysql
-```
+| Operation | Method | Why |
+|-----------|--------|-----|
+| Backup/Restore | `kubectl exec` streaming | Simple, immediate, local storage |
+| Schema init | K8s Job | Complex multi-file execution |
+| Fixtures | K8s Job | Cluster-native, audit trail |
+
 Backups stored in `db/data/backups/` (gitignored).
 
 ## Critical Patterns
@@ -85,9 +92,17 @@ K8s manifests use `envsubst` for variable substitution:
 
 ### Pre-commit Hooks
 
-12+ linters run on every commit: sqlfluff (SQL), shellcheck/shfmt (bash), kube-linter (K8s), hadolint (Docker), gitleaks (secrets), trivy (vulnerabilities), commitlint (conventional commits).
+12+ linters run on every commit. Install: `make pre-commit-install`
 
-Install: `make pre-commit-install`
+| Linter | Target | Command |
+|--------|--------|---------|
+| sqlfluff | SQL files | `make lint-sql` |
+| shellcheck/shfmt | Shell scripts | `make lint-shell` |
+| kube-linter | K8s manifests | `make lint-k8s` |
+| hadolint | Dockerfiles | `make lint-docker` |
+| gitleaks | Secrets scan | `make scan-secrets` |
+| trivy | Vulnerabilities | `make scan-security` |
+| commitlint | Commit messages | (auto on commit) |
 
 ### File Naming Conventions
 
@@ -107,3 +122,13 @@ Install: `make pre-commit-install`
 Connection: `client-database:3306` (ClusterIP, cluster-internal only)
 Database: `client_db`
 User: `client_db_user` (SELECT, INSERT, UPDATE - no DELETE)
+
+## Conventional Commits
+
+This repo enforces conventional commit format:
+- `feat:` new feature
+- `fix:` bug fix
+- `docs:` documentation only
+- `chore:` maintenance tasks
+- `refactor:` code restructuring
+- `ci:` CI/CD changes
