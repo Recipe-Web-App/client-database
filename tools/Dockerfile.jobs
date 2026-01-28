@@ -5,7 +5,7 @@
 # =============================================================================
 # Stage 1: Builder - Install tools and dependencies
 # =============================================================================
-FROM debian:bookworm-slim AS builder
+FROM debian:bookworm-slim@sha256:56ff6d36d4eb3db13a741b342ec466f121480b5edded42e4b7ee850ce7a418ee AS builder
 
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -41,7 +41,7 @@ RUN curl -L "https://github.com/golang-migrate/migrate/releases/download/${MIGRA
 # =============================================================================
 # Stage 2: Runtime - Minimal image for Jobs
 # =============================================================================
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:56ff6d36d4eb3db13a741b342ec466f121480b5edded42e4b7ee850ce7a418ee
 
 # Set locale to avoid encoding issues
 ENV LANG=C.UTF-8 \

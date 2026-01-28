@@ -12,7 +12,7 @@
 # =============================================================================
 # Stage 1: Base MySQL with production tools
 # =============================================================================
-FROM mysql:8.0 AS base
+FROM mysql:8.0@sha256:7a9d63525e8072408862dd62226440db869e745e37f36968b26e3ef03d6e9641 AS base
 
 # Metadata
 LABEL maintainer="Recipe Web App Team"
