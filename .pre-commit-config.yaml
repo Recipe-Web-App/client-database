@@ -77,7 +77,7 @@ repos:
 
   # Docker and filesystem security scanning
   - repo: https://github.com/mxab/pre-commit-trivy
-    rev: v0.16.0
+    rev: v0.17.0
     hooks:
       - id: trivyfs-docker
         name: Scan filesystem for vulnerabilities
@@ -97,7 +97,7 @@ repos:
 
   # YAML linting
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.37.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         name: Lint YAML files
@@ -124,7 +124,7 @@ repos:
 
   # Makefile linting
   - repo: https://github.com/mrtazz/checkmake
-    rev: 0.2.2
+    rev: v0.3.2
     hooks:
       - id: checkmake
         name: Lint Makefile
@@ -132,7 +132,7 @@ repos:
 
   # Commit message linting
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: v9.23.0
+    rev: v9.24.0
     hooks:
       - id: commitlint
         name: Lint commit message
