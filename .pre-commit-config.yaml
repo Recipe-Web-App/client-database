@@ -32,7 +32,7 @@ repos:
 
   # SQL linting and formatting
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 4.0.0a2
+    rev: 4.0.4
     hooks:
       - id: sqlfluff-fix
         name: Lint and fix SQL files
