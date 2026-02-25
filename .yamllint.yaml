@@ -82,3 +82,4 @@ ignore: |
   node_modules/
   db/data/backups/
   db/data/exports/
+  .beads/
